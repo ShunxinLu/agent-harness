@@ -11,6 +11,7 @@ Provides tools for:
 
 import json
 import sys
+import uuid
 from pathlib import Path
 from typing import Any, Optional
 
@@ -258,10 +259,11 @@ async def handle_run_tests(arguments: dict) -> list[TextContent]:
     result = runner.run()
 
     # Store in cache
+    run_id = str(uuid.uuid4())
     if cache:
         cache.store_run(
             project=config.name,
-            run_id=str(hash(str(project_path))),
+            run_id=run_id,
             results=[r.model_dump() for r in result.results] if result.results else [],
         )
         cache.close()
@@ -270,7 +272,7 @@ async def handle_run_tests(arguments: dict) -> list[TextContent]:
         cache = get_default_cache()
         cache.store_run(
             project=config.name,
-            run_id=str(hash(str(project_path))),
+            run_id=run_id,
             results=[r.model_dump() for r in result.results] if result.results else [],
         )
         cache.close()
@@ -283,7 +285,7 @@ async def handle_run_tests(arguments: dict) -> list[TextContent]:
 
 async def handle_list_projects(arguments: dict) -> list[TextContent]:
     """List all detectable projects."""
-    base_dir = arguments.get("base_dir", "c:/Users/lushu/projects")
+    base_dir = arguments.get("base_dir", str(Path.home() / "projects"))
     scan_dir = Path(base_dir)
 
     if not scan_dir.exists():

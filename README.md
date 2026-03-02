@@ -14,7 +14,7 @@ A comprehensive test harness for AI agent development with multi-framework suppo
 ## Installation
 
 ```bash
-cd harness
+cd agent-harness
 pip install -e .
 ```
 
@@ -177,8 +177,8 @@ Add to your Claude Code MCP settings:
 ## Project Structure
 
 ```
-harness/
-├── src/harness/
+agent-harness/
+├── src/agent_harness/
 │   ├── __init__.py          # Package init with lazy exports
 │   ├── verify.py            # Main CLI (Click)
 │   ├── scaffold.py          # Project scaffolding CLI

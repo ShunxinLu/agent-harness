@@ -58,7 +58,7 @@ def style(text: str, fg: str = None, bold: bool = False) -> str:
     return result
 
 
-def run_tests(config: ProjectConfig, trace_enabled: bool = False) -> TestRunResult:
+def run_tests(config: ProjectConfig, trace_enabled: bool = False, extra_args: Optional[list[str]] = None) -> TestRunResult:
     """Run tests for a project."""
 
     runner = get_runner(config)
@@ -75,7 +75,11 @@ def run_tests(config: ProjectConfig, trace_enabled: bool = False) -> TestRunResu
     if trace_enabled:
         console_print("Tracing: enabled")
 
-    result = runner.run()
+    # Pass extra args to runner if provided (e.g., specific test names for --last-failed)
+    if extra_args:
+        result = runner.run(extra_args=extra_args)
+    else:
+        result = runner.run()
     return result
 
 
@@ -102,7 +106,7 @@ def verify(project, run_all, base_dir, as_json, last_failed, enable_trace):
             raise SystemExit(1)
 
     elif run_all:
-        scan_dir = Path(base_dir) if base_dir else Path("c:/Users/lushu/projects")
+        scan_dir = Path(base_dir) if base_dir else Path.home() / "projects"
         projects_to_run = scan_projects(scan_dir)
 
         if not projects_to_run:
@@ -114,7 +118,7 @@ def verify(project, run_all, base_dir, as_json, last_failed, enable_trace):
         projects_to_run = scan_projects(scan_dir)
 
         if not projects_to_run:
-            default_dir = Path("c:/Users/lushu/projects")
+            default_dir = Path.home() / "projects"
             if default_dir.exists():
                 projects_to_run = scan_projects(default_dir)
 
@@ -131,14 +135,14 @@ def verify(project, run_all, base_dir, as_json, last_failed, enable_trace):
 
     for proj_config in projects_to_run:
         # Modify command for --last-failed
+        extra_args = None
         if last_failed:
             failed_tests = cache.get_last_failed(proj_config.name)
             if failed_tests and proj_config.framework == "pytest":
-                # Append specific test names to command
-                test_args = " ".join(failed_tests)
+                extra_args = failed_tests
                 console_print(f"Running {len(failed_tests)} failed test(s)...")
 
-        result = run_tests(proj_config, enable_trace)
+        result = run_tests(proj_config, enable_trace, extra_args=extra_args)
         all_results.append(result)
 
         # Cache the results
@@ -186,11 +190,11 @@ def verify(project, run_all, base_dir, as_json, last_failed, enable_trace):
 def list_projects(base_dir):
     """List all detectable test projects in a directory."""
 
-    scan_dir = Path(base_dir) if base_dir else Path("c:/Users/lushu/projects")
+    scan_dir = Path(base_dir) if base_dir else Path.home() / "projects"
 
     if not scan_dir.exists():
         console_print(f"[red]Directory not found: {scan_dir}[/red]")
-        raise click.Exit(1)
+        raise SystemExit(1)
 
     projects = scan_projects(scan_dir)
 
@@ -216,7 +220,7 @@ def detect(path):
 
     if not path_obj.exists():
         console_print(style(f"Path not found: {path}", fg="red"))
-        raise click.Exit(1)
+        raise SystemExit(1)
 
     config = detect_project(path_obj)
 

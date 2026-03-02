@@ -66,7 +66,7 @@ def create_pytest_template(project_path: Path):
     # conftest.py with sandbox fixtures
     conftest_content = '''"""Pytest fixtures with sandbox integration."""
 import pytest
-from harness.sandbox import SandboxManager, SandboxConfig
+from agent_harness.sandbox import SandboxManager, SandboxConfig
 
 
 @pytest.fixture(scope="session")
@@ -416,7 +416,7 @@ def create_project(name: str, framework: str, output_dir: str, services: str):
 
     if project_path.exists():
         console_print(style(f"Error: Directory already exists: {project_path}", fg="red"))
-        raise click.Exit(1)
+        raise SystemExit(1)
 
     console_print(f"Creating {style(framework, fg='cyan')} project: {style(name, fg='green', bold=True)}")
 
@@ -510,7 +510,7 @@ def daemon_start():
     if not compose_file.exists():
         console_print(style("Error: docker-compose.yml not found", fg="red"))
         console_print("Run harness-scaffold create or add-sandbox first")
-        raise click.Exit(1)
+        raise SystemExit(1)
 
     console_print("Starting LocalStack daemon...")
 
@@ -534,12 +534,12 @@ def daemon_start():
                 console_print(style("[WARN]", fg="yellow") + " LocalStack may still be starting up")
         else:
             console_print(style("[FAIL]", fg="red") + f" Failed to start daemon: {result.stderr}")
-            raise click.Exit(1)
+            raise SystemExit(1)
 
     except FileNotFoundError:
         console_print(style("Error: docker-compose not found", fg="red"))
         console_print("Install Docker Compose or use Docker Desktop")
-        raise click.Exit(1)
+        raise SystemExit(1)
 
 
 @daemon.command("stop")
@@ -556,7 +556,7 @@ def daemon_stop():
 
     if not compose_file.exists():
         console_print(style("Error: docker-compose.yml not found", fg="red"))
-        raise click.Exit(1)
+        raise SystemExit(1)
 
     console_print("Stopping LocalStack daemon...")
 
@@ -572,11 +572,11 @@ def daemon_stop():
             console_print(style("[OK]", fg="green") + " LocalStack daemon stopped")
         else:
             console_print(style("[FAIL]", fg="red") + f" Failed to stop daemon: {result.stderr}")
-            raise click.Exit(1)
+            raise SystemExit(1)
 
     except FileNotFoundError:
         console_print(style("Error: docker-compose not found", fg="red"))
-        raise click.Exit(1)
+        raise SystemExit(1)
 
 
 @daemon.command("status")
@@ -614,7 +614,7 @@ def daemon_reset():
     if not manager.is_daemon_healthy():
         console_print(style("[FAIL]", fg="red") + " LocalStack daemon is not running")
         console_print("Start with: harness-scaffold daemon start")
-        raise click.Exit(1)
+        raise SystemExit(1)
 
     console_print("Resetting LocalStack state...")
 
