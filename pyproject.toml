@@ -1,0 +1,32 @@
+[project]
+name = "harness"
+version = "0.1.0"
+description = "Zero-Trust Agent Harness for Claude Code development"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "click>=8.0.0",
+    "pydantic>=2.0.0",
+    "pyyaml>=6.0",
+    "boto3>=1.34.0",
+    "duckdb>=0.10.0",
+    "mcp>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+]
+
+[project.scripts]
+harness-verify = "harness.verify:app"
+harness-scaffold = "harness.scaffold:app"
+harness-mcp = "harness.mcp_server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/harness"]

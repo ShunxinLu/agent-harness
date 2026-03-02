@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip install:*)",
+      "Bash(harness-scaffold --help:*)",
+      "Bash(harness-verify:*)",
+      "Bash(harness-scaffold create:*)",
+      "Bash(python -c:*)",
+      "WebFetch(domain:openai.com)",
+      "Bash(harness-mcp --help:*)",
+      "Bash(git init:*)",
+      "Bash(git add:*)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\lushu\\projects"
+    ]
+  }
+}

@@ -1,0 +1,250 @@
+# Zero-Trust Agent Harness
+
+A comprehensive test harness for AI agent development with multi-framework support, sandbox isolation, tracing, and MCP server integration for Claude Code.
+
+## Features
+
+- **Multi-Framework Support**: pytest, pyspark, bun, npm, maven, gradle, sbt, cargo, go
+- **MCP Server**: Direct integration with Claude Code for autonomous testing
+- **Sandbox Isolation**: LocalStack + DuckDB for AWS/local database testing
+- **Execution Tracing**: DuckDB-backed trace storage with SQL query support
+- **Result Caching**: Persistent test result storage with trend analysis
+- **Project Scaffolding**: Generate new projects with pre-configured test setups
+
+## Installation
+
+```bash
+cd harness
+pip install -e .
+```
+
+### For Development
+
+```bash
+pip install -e ".[dev]"
+```
+
+## Quick Start
+
+### Run tests (auto-detect projects)
+
+```bash
+harness-verify verify
+```
+
+### Run with JSON output (for Claude Code)
+
+```bash
+harness-verify verify --json
+```
+
+### Run specific project
+
+```bash
+harness-verify verify --project path/to/project
+```
+
+### Run only previously failed tests
+
+```bash
+harness-verify verify --last-failed
+```
+
+## CLI Commands
+
+### harness-verify
+
+| Command | Description |
+|---------|-------------|
+| `verify` | Run tests with optimized output |
+| `list` | List all detectable test projects |
+| `detect` | Detect test framework for a path |
+| `cache status` | Show cache statistics |
+| `cache trend <project>` | Show test trend over time |
+| `cache clear` | Clear test result cache |
+| `trace view <run-id>` | View trace events |
+| `trace export <run-id>` | Export traces as JSON |
+| `trace compare <id1> <id2>` | Compare two trace runs |
+| `trace list` | List recent trace runs |
+| `trace analyze` | Analyze error patterns |
+
+### harness-scaffold
+
+| Command | Description |
+|---------|-------------|
+| `create <name>` | Create a new project with test scaffolding |
+| `add-sandbox <path>` | Add sandbox configuration to existing project |
+| `daemon start` | Start LocalStack daemon (docker-compose up -d) |
+| `daemon stop` | Stop LocalStack daemon |
+| `daemon status` | Check LocalStack health |
+| `daemon reset` | Purge S3 buckets without restart |
+
+### harness-mcp
+
+Run the MCP server for Claude Code integration:
+
+```bash
+harness-mcp
+```
+
+## Supported Frameworks
+
+| Framework | Detection Files | Test Command |
+|-----------|-----------------|--------------|
+| pytest | `pytest.ini`, `conftest.py`, `test_*.py` | `pytest tests/ -v --json-report` |
+| pyspark | `spark*.py`, `*_spark.py` | `pytest --spark-home=find` |
+| bun | `bunfig.toml`, `*.test.ts` | `bun test` |
+| npm | `package.json` with test script | `npm test` |
+| maven | `pom.xml` | `mvn test` |
+| gradle | `build.gradle` | `gradle test` |
+| sbt | `build.sbt` | `sbt test` |
+| cargo | `Cargo.toml` | `cargo test` |
+| go | `go.mod` | `go test ./...` |
+
+## Examples
+
+### Create a new project with sandbox
+
+```bash
+# Create pytest project with S3 and DuckDB sandbox
+harness-scaffold create my-agent --framework pytest --services s3,duckdb
+
+cd my-agent
+
+# Start LocalStack daemon (one-time setup)
+harness-scaffold daemon start
+
+# Run tests
+harness-verify verify --project .
+```
+
+### View test trends
+
+```bash
+# Show last 10 runs for a project
+harness-verify cache trend my-agent --limit 10
+```
+
+### Debug with traces
+
+```bash
+# Run with tracing enabled
+harness-verify verify --project . --trace
+
+# View trace events
+harness-verify trace view <run-id>
+
+# Export for analysis
+harness-verify trace export <run-id> -o traces.json
+```
+
+### Analyze error patterns
+
+```bash
+# Find recurring error patterns
+harness-verify trace analyze --pattern "connection" --min-count 3
+```
+
+## MCP Server Integration
+
+Add to your Claude Code MCP settings:
+
+```json
+{
+  "mcpServers": {
+    "harness": {
+      "command": "harness-mcp"
+    }
+  }
+}
+```
+
+### Available MCP Tools
+
+| Tool | Description |
+|------|-------------|
+| `run_tests` | Run tests for any project |
+| `list_projects` | List projects in a directory |
+| `detect_framework` | Detect framework for a path |
+| `get_cache_status` | Get cache statistics |
+| `get_cache_trend` | Get test trend over time |
+| `get_last_failed` | Get recently failed tests |
+| `list_traces` | List recent trace runs |
+| `get_trace` | Get trace events for a run |
+| `analyze_errors` | Analyze error patterns |
+| `clear_cache` | Clear the test cache |
+
+## Project Structure
+
+```
+harness/
+├── src/harness/
+│   ├── __init__.py          # Package init with lazy exports
+│   ├── verify.py            # Main CLI (Click)
+│   ├── scaffold.py          # Project scaffolding CLI
+│   ├── config.py            # Framework detection (10 frameworks)
+│   ├── cache.py             # DuckDB-backed result cache
+│   ├── tracing.py           # Trace decorator and store
+│   ├── trace_viewer.py      # Trace CLI and analysis
+│   ├── mcp_server.py        # MCP server for Claude Code
+│   ├── runners/
+│   │   ├── __init__.py
+│   │   ├── pytest_runner.py  # Pytest executor
+│   │   ├── bun_runner.py     # Bun/npm executor
+│   │   └── generic_runner.py # Maven/Gradle/SBT/Cargo/Go
+│   ├── sandbox/
+│   │   └── __init__.py       # LocalStack + DuckDB management
+│   └── output/
+│       └── compressor.py     # Stack trace compression
+├── pyproject.toml
+└── README.md
+```
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    harness-verify CLI                        │
+├─────────────────────────────────────────────────────────────┤
+│  detect  │  list  │  verify  │  trace  │  cache  │  scaffold│
+└────┬─────────┬─────────┬──────────┬─────────┬─────────┬──────┘
+     │         │         │          │         │         │
+     ▼         ▼         ▼          ▼         ▼         ▼
+┌─────────────────────────────────────────────────────────────┐
+│                      Core Modules                            │
+├──────────────┬──────────────┬──────────────┬────────────────┤
+│   config.py  │   runners/   │   output/    │   sandbox/     │
+│  (detection) │ (execution)  │ (compression)│  (isolation)   │
+├──────────────┼──────────────┼──────────────┼────────────────┤
+│   tracing.py │   cache.py   │  templates/  │                │
+│  (debugging) │ (performance)│ (scaffolding)│                │
+└──────────────┴──────────────┴──────────────┴────────────────┘
+     │              │              │
+     ▼              ▼              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   External Services                          │
+│    LocalStack (Docker)  │  DuckDB  │  pytest  │  bun/npm   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Data Storage
+
+Test results and traces are stored in:
+
+- **Windows**: `~/.harness/data/harness.duckdb`
+- **Linux/Mac**: `~/.harness/data/harness.duckdb`
+
+The DuckDB database enables complex SQL queries across test runs:
+
+```sql
+-- Correlate test failures with agent traces
+SELECT t.test_name, tr.tool_name, tr.error_type
+FROM test_results t
+JOIN traces tr ON t.run_id = tr.run_id
+WHERE t.status = 'failed'
+  AND tr.timestamp > NOW() - INTERVAL '24 hours'
+```
+
+## License
+
+MIT
