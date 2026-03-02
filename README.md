@@ -32,6 +32,8 @@ pip install -e ".[dev]"
 harness-verify verify
 ```
 
+By default, project scanning starts from the current working directory.
+
 ### Run with JSON output (for Claude Code)
 
 ```bash
@@ -42,6 +44,12 @@ harness-verify verify --json
 
 ```bash
 harness-verify verify --project path/to/project
+```
+
+### Run with explicit data mode (safe default)
+
+```bash
+harness-verify verify --project path/to/project --data-mode mock
 ```
 
 ### Run only previously failed tests
@@ -174,6 +182,24 @@ Add to your Claude Code MCP settings:
 | `analyze_errors` | Analyze error patterns |
 | `clear_cache` | Clear the test cache |
 
+`run_tests` accepts:
+- `project_path`
+- `json_output`
+- `last_failed` (pytest/pyspark only)
+- `data_mode` (`mock`, `metadata`, `human-contract`; default `mock`)
+
+## Safety Defaults
+
+- Safe-by-default data mode is `mock`.
+- In `mock` mode, direct real-AWS fallback is blocked by default.
+- To explicitly allow real AWS clients in sandbox helpers, set:
+
+```bash
+export HARNESS_ALLOW_REAL_AWS=1
+```
+
+Use this override only when intentionally running outside safe-local mode.
+
 ## Project Structure
 
 ```
@@ -190,7 +216,8 @@ harness/
 │   ├── runners/
 │   │   ├── __init__.py
 │   │   ├── pytest_runner.py  # Pytest executor
-│   │   ├── bun_runner.py     # Bun/npm executor
+│   │   ├── bun_runner.py     # Bun executor
+│   │   ├── npm_runner.py     # npm executor
 │   │   └── generic_runner.py # Maven/Gradle/SBT/Cargo/Go
 │   ├── sandbox/
 │   │   └── __init__.py       # LocalStack + DuckDB management

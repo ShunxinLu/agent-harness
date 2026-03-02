@@ -10,6 +10,7 @@ Usage:
 """
 
 import json
+import os
 import sys
 import uuid
 import time
@@ -22,6 +23,7 @@ from .config import detect_project, scan_projects, ProjectConfig
 from .output import TestRunResult, format_result_json, format_summary
 from .runners import get_runner
 from .cache import HarnessCache, get_default_cache
+from .tracing import Tracer, create_trace_store
 from .trace_viewer import trace
 
 
@@ -58,7 +60,12 @@ def style(text: str, fg: str = None, bold: bool = False) -> str:
     return result
 
 
-def run_tests(config: ProjectConfig, trace_enabled: bool = False) -> TestRunResult:
+def run_tests(
+    config: ProjectConfig,
+    trace_enabled: bool = False,
+    extra_args: Optional[list[str]] = None,
+    tracer: Optional[Tracer] = None,
+) -> TestRunResult:
     """Run tests for a project."""
 
     runner = get_runner(config)
@@ -74,8 +81,34 @@ def run_tests(config: ProjectConfig, trace_enabled: bool = False) -> TestRunResu
 
     if trace_enabled:
         console_print("Tracing: enabled")
+    if tracer:
+        tracer.log(
+            "verify.project.start",
+            event_type="verify.project.start",
+            project=config.name,
+            framework=config.framework,
+            path=str(config.path),
+            extra_args=extra_args or [],
+        )
 
-    result = runner.run()
+    if extra_args and config.framework in ("pytest", "pyspark", "bun", "npm"):
+        result = runner.run(extra_args=extra_args)
+    else:
+        result = runner.run()
+
+    if tracer:
+        tracer.log(
+            "verify.project.complete",
+            event_type="verify.project.complete",
+            project=config.name,
+            framework=config.framework,
+            total=result.total,
+            passed=result.passed,
+            failed=result.failed,
+            skipped=result.skipped,
+            errors=result.errors,
+            duration=result.duration,
+        )
     return result
 
 
@@ -87,8 +120,25 @@ def run_tests(config: ProjectConfig, trace_enabled: bool = False) -> TestRunResu
 @click.option("--json", "as_json", is_flag=True, help="Output results as JSON")
 @click.option("--last-failed", "-lf", is_flag=True, help="Run only previously failed tests")
 @click.option("--trace", "-t", "enable_trace", is_flag=True, help="Enable tracing for this run")
-def verify(project, run_all, base_dir, as_json, last_failed, enable_trace):
+@click.option(
+    "--data-mode",
+    type=click.Choice(["mock", "metadata", "human-contract"]),
+    default="mock",
+    show_default=True,
+    help="Data access mode for this run",
+)
+def verify(project, run_all, base_dir, as_json, last_failed, enable_trace, data_mode):
     """Run tests and output optimized results."""
+
+    if data_mode == "mock" and os.getenv("HARNESS_ALLOW_REAL_AWS", "").lower() in {"1", "true", "yes"}:
+        console_print(
+            style(
+                "Refusing run: HARNESS_ALLOW_REAL_AWS is enabled while --data-mode=mock. "
+                "Unset HARNESS_ALLOW_REAL_AWS or use a non-mock mode explicitly.",
+                fg="red",
+            )
+        )
+        raise SystemExit(1)
 
     # Determine what to run
     projects_to_run = []
@@ -102,7 +152,7 @@ def verify(project, run_all, base_dir, as_json, last_failed, enable_trace):
             raise SystemExit(1)
 
     elif run_all:
-        scan_dir = Path(base_dir) if base_dir else Path("c:/Users/lushu/projects")
+        scan_dir = Path(base_dir).expanduser() if base_dir else Path.cwd()
         projects_to_run = scan_projects(scan_dir)
 
         if not projects_to_run:
@@ -110,13 +160,8 @@ def verify(project, run_all, base_dir, as_json, last_failed, enable_trace):
             raise SystemExit(0)
 
     else:
-        scan_dir = Path(base_dir) if base_dir else Path.cwd()
+        scan_dir = Path(base_dir).expanduser() if base_dir else Path.cwd()
         projects_to_run = scan_projects(scan_dir)
-
-        if not projects_to_run:
-            default_dir = Path("c:/Users/lushu/projects")
-            if default_dir.exists():
-                projects_to_run = scan_projects(default_dir)
 
     if not projects_to_run:
         console_print(style("No testable projects found. Use --project to specify a project.", fg="red"))
@@ -124,34 +169,75 @@ def verify(project, run_all, base_dir, as_json, last_failed, enable_trace):
 
     # Get cache for caching results and --last-failed functionality
     cache = get_default_cache()
+    trace_store = create_trace_store() if enable_trace else None
 
     # Run tests for each project
     all_results = []
     run_id = str(uuid.uuid4())
+    tracer = Tracer(run_id=run_id, store=trace_store) if trace_store else None
 
-    for proj_config in projects_to_run:
-        # Modify command for --last-failed
-        if last_failed:
-            failed_tests = cache.get_last_failed(proj_config.name)
-            if failed_tests and proj_config.framework == "pytest":
-                # Append specific test names to command
-                test_args = " ".join(failed_tests)
-                console_print(f"Running {len(failed_tests)} failed test(s)...")
-
-        result = run_tests(proj_config, enable_trace)
-        all_results.append(result)
-
-        # Cache the results
-        duration_ms = 0  # Could calculate from result
-        cache.store_run(
-            project=proj_config.name,
+    if tracer:
+        tracer.log(
+            "verify.run.start",
+            event_type="verify.run.start",
             run_id=run_id,
-            results=[r.model_dump() for r in result.results] if result.results else [],
-            duration_ms=duration_ms,
+            project_count=len(projects_to_run),
+            last_failed=last_failed,
+            data_mode=data_mode,
         )
 
-    # Close cache connection
-    cache.close()
+    previous_data_mode = os.environ.get("HARNESS_DATA_MODE")
+    os.environ["HARNESS_DATA_MODE"] = data_mode
+
+    try:
+        for proj_config in projects_to_run:
+            extra_args = None
+
+            # Modify command for --last-failed
+            if last_failed:
+                if proj_config.framework in ("pytest", "pyspark"):
+                    failed_tests = cache.get_last_failed(proj_config.name)
+                    if failed_tests:
+                        extra_args = failed_tests
+                        console_print(f"Running {len(failed_tests)} failed test(s)...")
+                    else:
+                        console_print("No previously failed tests found; running full suite.")
+                else:
+                    console_print(
+                        f"--last-failed is only supported for pytest/pyspark. "
+                        f"Running full suite for framework: {proj_config.framework}"
+                    )
+
+            result = run_tests(proj_config, enable_trace, extra_args=extra_args, tracer=tracer)
+            all_results.append(result)
+
+            # Cache the results
+            duration_ms = 0  # Could calculate from result
+            cache.store_run(
+                project=proj_config.name,
+                run_id=run_id,
+                results=[r.model_dump() for r in result.results] if result.results else [],
+                duration_ms=duration_ms,
+            )
+
+        if tracer:
+            tracer.log(
+                "verify.run.complete",
+                event_type="verify.run.complete",
+                run_id=run_id,
+                total_projects=len(all_results),
+                total_tests=sum(r.total for r in all_results),
+                total_failed=sum(r.failed for r in all_results),
+                data_mode=data_mode,
+            )
+    finally:
+        if previous_data_mode is None:
+            os.environ.pop("HARNESS_DATA_MODE", None)
+        else:
+            os.environ["HARNESS_DATA_MODE"] = previous_data_mode
+        cache.close()
+        if trace_store:
+            trace_store.close()
 
     # Output results
     if as_json:
@@ -161,6 +247,7 @@ def verify(project, run_all, base_dir, as_json, last_failed, enable_trace):
             "total_passed": sum(r.passed for r in all_results),
             "total_failed": sum(r.failed for r in all_results),
             "run_id": run_id,
+            "data_mode": data_mode,
         }
         click.echo(json.dumps(output, indent=2))
     else:
@@ -186,7 +273,7 @@ def verify(project, run_all, base_dir, as_json, last_failed, enable_trace):
 def list_projects(base_dir):
     """List all detectable test projects in a directory."""
 
-    scan_dir = Path(base_dir) if base_dir else Path("c:/Users/lushu/projects")
+    scan_dir = Path(base_dir).expanduser() if base_dir else Path.cwd()
 
     if not scan_dir.exists():
         console_print(f"[red]Directory not found: {scan_dir}[/red]")

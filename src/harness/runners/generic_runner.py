@@ -184,13 +184,16 @@ def get_runner(config: ProjectConfig):
     """Factory function to get appropriate runner."""
     from .pytest_runner import PytestRunner
     from .bun_runner import BunRunner
+    from .npm_runner import NpmRunner
 
     if config.framework == "pytest":
         return PytestRunner(config.path, config.test_dir)
     elif config.framework == "pyspark":
         return PytestRunner(config.path, config.test_dir)
-    elif config.framework in ("bun", "npm"):
+    elif config.framework == "bun":
         return BunRunner(config.path)
+    elif config.framework == "npm":
+        return NpmRunner(config.path)
     elif config.framework in ("maven", "gradle", "sbt", "cargo", "go"):
         return GenericRunner(config.path, config.framework)
     return None

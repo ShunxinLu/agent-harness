@@ -220,8 +220,14 @@ def get_s3_client():
     if manager:
         return manager.get_s3_client()
 
-    # Fallback to real AWS (if credentials configured)
-    return boto3.client("s3")
+    # Safe-by-default: do not implicitly fall back to real AWS.
+    if os.getenv("HARNESS_ALLOW_REAL_AWS", "").lower() in {"1", "true", "yes"}:
+        return boto3.client("s3")
+
+    raise RuntimeError(
+        "No sandbox manager configured. Refusing direct AWS S3 access by default. "
+        "Configure .harness/sandbox.yaml, or set HARNESS_ALLOW_REAL_AWS=1 to opt in explicitly."
+    )
 
 
 def get_duckdb_connection(db_path: Optional[str] = None) -> duckdb.DuckDBPyConnection:

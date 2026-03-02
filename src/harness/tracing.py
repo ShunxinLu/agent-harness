@@ -76,6 +76,7 @@ class TraceStore:
             db_file.parent.mkdir(parents=True, exist_ok=True)
 
         self._conn = duckdb.connect(self.db_path)
+        self._closed = False
         self._init_schema()
 
     def _init_schema(self):
@@ -174,7 +175,14 @@ class TraceStore:
 
     def close(self):
         """Close the database connection."""
-        self._conn.close()
+        if not self._closed:
+            self._conn.close()
+            self._closed = True
+
+    @property
+    def is_closed(self) -> bool:
+        """Whether the underlying DuckDB connection has been closed."""
+        return self._closed
 
 
 class Tracer:
@@ -217,6 +225,7 @@ class Tracer:
             name=name,
             payload=kwargs,
             status="ok",
+            duration_ms=duration_ms,
         )
 
         self._events.append(event)
@@ -262,12 +271,26 @@ class Tracer:
 _default_store: Optional[TraceStore] = None
 
 
+def get_default_db_path() -> str:
+    """Get the default persistent DuckDB path used by the harness."""
+    data_dir = Path.home() / ".harness" / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    return str(data_dir / "harness.duckdb")
+
+
 def get_default_store(db_path: Optional[str] = None) -> TraceStore:
     """Get or create default trace store."""
     global _default_store
-    if _default_store is None:
+    if db_path is None:
+        db_path = get_default_db_path()
+    if _default_store is None or _default_store.is_closed:
         _default_store = TraceStore(db_path)
     return _default_store
+
+
+def create_trace_store(db_path: Optional[str] = None) -> TraceStore:
+    """Create a fresh trace-store connection to the default or provided database."""
+    return TraceStore(db_path or get_default_db_path())
 
 
 # Trace decorator

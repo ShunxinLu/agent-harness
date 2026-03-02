@@ -62,6 +62,7 @@ class HarnessCache:
             db_file.parent.mkdir(parents=True, exist_ok=True)
 
         self._conn = duckdb.connect(self.db_path)
+        self._closed = False
         self._init_schema()
 
     def _init_schema(self):
@@ -252,11 +253,25 @@ class HarnessCache:
 
     def close(self):
         """Close the database connection."""
-        self._conn.close()
+        if not self._closed:
+            self._conn.close()
+            self._closed = True
+
+    @property
+    def is_closed(self) -> bool:
+        """Whether the underlying DuckDB connection has been closed."""
+        return self._closed
 
 
 # Global cache instance
 _default_cache: Optional[HarnessCache] = None
+
+
+def get_default_db_path() -> str:
+    """Get the default persistent DuckDB path used by the harness."""
+    data_dir = Path.home() / ".harness" / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    return str(data_dir / "harness.duckdb")
 
 
 def get_default_cache(db_path: Optional[str] = None) -> HarnessCache:
@@ -267,11 +282,13 @@ def get_default_cache(db_path: Optional[str] = None) -> HarnessCache:
     global _default_cache
 
     if db_path is None:
-        # Use persistent storage
-        data_dir = Path.home() / ".harness" / "data"
-        data_dir.mkdir(parents=True, exist_ok=True)
-        db_path = str(data_dir / "harness.duckdb")
+        db_path = get_default_db_path()
 
-    if _default_cache is None:
+    if _default_cache is None or _default_cache.is_closed:
         _default_cache = HarnessCache(db_path)
     return _default_cache
+
+
+def create_cache(db_path: Optional[str] = None) -> HarnessCache:
+    """Create a fresh cache connection to the default or provided database."""
+    return HarnessCache(db_path or get_default_db_path())

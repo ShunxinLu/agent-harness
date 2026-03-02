@@ -10,7 +10,9 @@ Provides tools for:
 """
 
 import json
+import os
 import sys
+import uuid
 from pathlib import Path
 from typing import Any, Optional
 
@@ -19,8 +21,8 @@ from mcp.server.stdio import stdio_server
 from mcp.types import Tool, TextContent
 
 from .config import detect_project, detect_framework, scan_projects, ProjectConfig
-from .cache import HarnessCache, get_default_cache
-from .tracing import TraceStore, get_default_store
+from .cache import create_cache
+from .tracing import create_trace_store
 from .runners.generic_runner import get_runner
 from .output import format_summary
 
@@ -52,6 +54,12 @@ async def list_tools() -> list[Tool]:
                         "type": "boolean",
                         "description": "Run only previously failed tests",
                         "default": False
+                    },
+                    "data_mode": {
+                        "type": "string",
+                        "description": "Data access mode for the run",
+                        "enum": ["mock", "metadata", "human-contract"],
+                        "default": "mock",
                     }
                 },
                 "required": ["project_path"]
@@ -65,7 +73,7 @@ async def list_tools() -> list[Tool]:
                 "properties": {
                     "base_dir": {
                         "type": "string",
-                        "description": "Base directory to scan (default: c:/Users/lushu/projects)"
+                        "description": "Base directory to scan (default: current working directory)"
                     }
                 }
             }
@@ -229,6 +237,23 @@ async def handle_run_tests(arguments: dict) -> list[TextContent]:
     project_path = Path(arguments["project_path"])
     json_output = arguments.get("json_output", True)
     last_failed = arguments.get("last_failed", False)
+    data_mode = arguments.get("data_mode", "mock")
+    run_id = str(uuid.uuid4())
+
+    allowed_modes = {"mock", "metadata", "human-contract"}
+    if data_mode not in allowed_modes:
+        return [TextContent(type="text", text=f"Invalid data_mode: {data_mode}. Allowed: {sorted(allowed_modes)}")]
+
+    if data_mode == "mock" and os.getenv("HARNESS_ALLOW_REAL_AWS", "").lower() in {"1", "true", "yes"}:
+        return [
+            TextContent(
+                type="text",
+                text=(
+                    "Refusing run: HARNESS_ALLOW_REAL_AWS is enabled while data_mode=mock. "
+                    "Unset HARNESS_ALLOW_REAL_AWS or use a non-mock mode explicitly."
+                ),
+            )
+        ]
 
     if not project_path.exists():
         return [TextContent(type="text", text=f"Project path not found: {project_path}")]
@@ -241,53 +266,66 @@ async def handle_run_tests(arguments: dict) -> list[TextContent]:
             return [TextContent(type="text", text=f"Detected {framework} but could not configure project")]
         return [TextContent(type="text", text=f"No test framework detected in: {project_path}")]
 
-    # Get cache for last_failed
-    cache = None
+    extra_args = None
+
+    # Get cache info for last_failed
     if last_failed:
-        cache = get_default_cache()
-        failed_tests = cache.get_last_failed(config.name)
-        if failed_tests and config.framework == "pytest":
-            # Note: Would need to modify runner to support specific test names
-            pass
+        if config.framework in ("pytest", "pyspark"):
+            cache = create_cache()
+            try:
+                failed_tests = cache.get_last_failed(config.name)
+                if failed_tests:
+                    extra_args = failed_tests
+            finally:
+                cache.close()
 
     # Run tests
     runner = get_runner(config)
     if not runner:
         return [TextContent(type="text", text=f"No runner available for framework: {config.framework}")]
 
-    result = runner.run()
+    previous_data_mode = os.environ.get("HARNESS_DATA_MODE")
+    os.environ["HARNESS_DATA_MODE"] = data_mode
+    try:
+        if extra_args and config.framework in ("pytest", "pyspark", "bun", "npm"):
+            result = runner.run(extra_args=extra_args)
+        else:
+            result = runner.run()
+    finally:
+        if previous_data_mode is None:
+            os.environ.pop("HARNESS_DATA_MODE", None)
+        else:
+            os.environ["HARNESS_DATA_MODE"] = previous_data_mode
 
     # Store in cache
-    if cache:
+    cache = create_cache()
+    try:
         cache.store_run(
             project=config.name,
-            run_id=str(hash(str(project_path))),
+            run_id=run_id,
             results=[r.model_dump() for r in result.results] if result.results else [],
         )
-        cache.close()
-    else:
-        # Still cache the result
-        cache = get_default_cache()
-        cache.store_run(
-            project=config.name,
-            run_id=str(hash(str(project_path))),
-            results=[r.model_dump() for r in result.results] if result.results else [],
-        )
+    finally:
         cache.close()
 
     if json_output:
-        return [TextContent(type="text", text=json.dumps(result.model_dump(), indent=2, default=str))]
+        payload = result.model_dump(mode="json")
+        payload["run_id"] = run_id
+        payload["last_failed_applied"] = bool(extra_args)
+        payload["data_mode"] = data_mode
+        return [TextContent(type="text", text=json.dumps(payload, indent=2, default=str))]
     else:
-        return [TextContent(type="text", text=format_summary(result))]
+        status = format_summary(result)
+        return [TextContent(type="text", text=f"Run ID: {run_id}\nStatus: {status}")]
 
 
 async def handle_list_projects(arguments: dict) -> list[TextContent]:
     """List all detectable projects."""
-    base_dir = arguments.get("base_dir", "c:/Users/lushu/projects")
-    scan_dir = Path(base_dir)
+    base_dir = arguments.get("base_dir")
+    scan_dir = Path(base_dir).expanduser() if base_dir else Path.cwd()
 
     if not scan_dir.exists():
-        return [TextContent(type="text", text=f"Directory not found: {base_dir}")]
+        return [TextContent(type="text", text=f"Directory not found: {scan_dir}")]
 
     projects = scan_projects(scan_dir)
 
@@ -332,9 +370,11 @@ async def handle_detect_framework(arguments: dict) -> list[TextContent]:
 
 async def handle_get_cache_status(arguments: dict) -> list[TextContent]:
     """Get cache statistics."""
-    cache = get_default_cache()
-    stats = cache.get_stats()
-    cache.close()
+    cache = create_cache()
+    try:
+        stats = cache.get_stats()
+    finally:
+        cache.close()
 
     result = {
         "total_runs": stats.total_runs,
@@ -352,9 +392,11 @@ async def handle_get_cache_trend(arguments: dict) -> list[TextContent]:
     project = arguments["project"]
     limit = arguments.get("limit", 10)
 
-    cache = get_default_cache()
-    trend = cache.get_trend(project, limit)
-    cache.close()
+    cache = create_cache()
+    try:
+        trend = cache.get_trend(project, limit)
+    finally:
+        cache.close()
 
     if not trend:
         return [TextContent(type="text", text=f"No cache data found for project: {project}")]
@@ -366,9 +408,11 @@ async def handle_get_last_failed(arguments: dict) -> list[TextContent]:
     """Get last failed tests for a project."""
     project = arguments["project"]
 
-    cache = get_default_cache()
-    failed = cache.get_last_failed(project)
-    cache.close()
+    cache = create_cache()
+    try:
+        failed = cache.get_last_failed(project)
+    finally:
+        cache.close()
 
     return [TextContent(type="text", text=json.dumps({"failed_tests": failed}, indent=2))]
 
@@ -377,17 +421,19 @@ async def handle_list_traces(arguments: dict) -> list[TextContent]:
     """List recent traces."""
     limit = arguments.get("limit", 20)
 
-    store = get_default_store()
-    results = store.query(f"""
-        SELECT run_id, COUNT(*) as event_count,
-               MIN(timestamp) as start_time,
-               SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) as error_count
-        FROM traces
-        GROUP BY run_id
-        ORDER BY start_time DESC
-        LIMIT {limit}
-    """)
-    store.close()
+    store = create_trace_store()
+    try:
+        results = store.query(f"""
+            SELECT run_id, COUNT(*) as event_count,
+                   MIN(timestamp) as start_time,
+                   SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) as error_count
+            FROM traces
+            GROUP BY run_id
+            ORDER BY start_time DESC
+            LIMIT {limit}
+        """)
+    finally:
+        store.close()
 
     # Convert to serializable format
     for row in results:
@@ -402,13 +448,13 @@ async def handle_get_trace(arguments: dict) -> list[TextContent]:
     run_id = arguments["run_id"]
     errors_only = arguments.get("errors_only", False)
 
-    store = get_default_store()
-    events = store.get_by_run(run_id)
-
-    if errors_only:
-        events = [e for e in events if e.status == "error"]
-
-    store.close()
+    store = create_trace_store()
+    try:
+        events = store.get_by_run(run_id)
+        if errors_only:
+            events = [e for e in events if e.status == "error"]
+    finally:
+        store.close()
 
     result = []
     for event in events:
@@ -432,21 +478,21 @@ async def handle_analyze_errors(arguments: dict) -> list[TextContent]:
     pattern = arguments.get("pattern", "")
     min_count = arguments.get("min_count", 3)
 
-    store = get_default_store()
-
-    if pattern:
-        results = store.analyze_patterns(pattern, min_count)
-    else:
-        results = store.query("""
-            SELECT event_type, name, error_message, COUNT(*) as count
-            FROM traces
-            WHERE status = 'error'
-            GROUP BY event_type, name, error_message
-            ORDER BY count DESC
-            LIMIT 20
-        """)
-
-    store.close()
+    store = create_trace_store()
+    try:
+        if pattern:
+            results = store.analyze_patterns(pattern, min_count)
+        else:
+            results = store.query("""
+                SELECT event_type, name, error_message, COUNT(*) as count
+                FROM traces
+                WHERE status = 'error'
+                GROUP BY event_type, name, error_message
+                ORDER BY count DESC
+                LIMIT 20
+            """)
+    finally:
+        store.close()
 
     return [TextContent(type="text", text=json.dumps(results, indent=2, default=str))]
 
@@ -455,9 +501,11 @@ async def handle_clear_cache(arguments: dict) -> list[TextContent]:
     """Clear the cache."""
     project = arguments.get("project")
 
-    cache = get_default_cache()
-    cache.clear(project=project)
-    cache.close()
+    cache = create_cache()
+    try:
+        cache.clear(project=project)
+    finally:
+        cache.close()
 
     if project:
         return [TextContent(type="text", text=f"Cache cleared for project: {project}")]
