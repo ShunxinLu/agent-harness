@@ -43,6 +43,7 @@ class TestRunResult(BaseModel):
     duration: float = 0.0
     results: list[TestResult] = []
     summary: str = ""
+    execution_status: str = "ok"  # ok, timeout, tool_missing, runner_error
 
     class Config:
         arbitrary_types_allowed = True
@@ -193,11 +194,14 @@ def format_result_json(result: TestRunResult, compact: bool = True) -> str:
     return json.dumps(output, indent=2)
 
 
-def format_summary(result: TestRunResult) -> str:
+def format_summary(result: TestRunResult, print_output: bool = True) -> str:
     """Format a human-readable summary."""
 
     # Status indicators (ASCII only for Windows compatibility)
-    if result.failed == 0 and result.errors == 0:
+    if result.execution_status != "ok":
+        status_icon = "[FAIL]"
+        status_text = "ERROR"
+    elif result.failed == 0 and result.errors == 0:
         status_icon = "[PASS]"
         status_text = "PASSED"
     else:
@@ -214,6 +218,8 @@ def format_summary(result: TestRunResult) -> str:
         f"Skipped: {result.skipped} | "
         f"Errors: {result.errors}"
     )
+    if result.execution_status != "ok":
+        output.append(f"Execution: {result.execution_status}")
     output.append(f"Duration: {result.duration:.2f}s")
 
     # Show failures
@@ -231,6 +237,8 @@ def format_summary(result: TestRunResult) -> str:
                         output.append(f"    > {ctx}")
             output.append("")
 
-    print("\n".join(output))
+    summary_text = "\n".join(output)
+    if print_output:
+        print(summary_text)
 
     return status_text

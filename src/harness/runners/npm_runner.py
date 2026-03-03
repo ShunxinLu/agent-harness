@@ -40,12 +40,14 @@ class NpmRunner:
                 project=self.project_path.name,
                 framework="npm",
                 summary="Test execution timed out after 5 minutes",
+                execution_status="timeout",
             )
         except FileNotFoundError:
             return TestRunResult(
                 project=self.project_path.name,
                 framework="npm",
                 summary="npm not found. Install Node.js and npm first.",
+                execution_status="tool_missing",
             )
 
     def _parse_result(self, result: subprocess.CompletedProcess) -> TestRunResult:
@@ -84,6 +86,7 @@ class NpmRunner:
             duration=self._extract_duration(output),
             results=[summary_result],
             summary=output.split("\n")[-8:] if output else ["No output"],
+            execution_status="ok",
         )
 
     def _extract_counts(self, output: str) -> dict[str, int]:

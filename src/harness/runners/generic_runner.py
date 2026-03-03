@@ -60,6 +60,7 @@ class GenericRunner:
                 duration=0,  # Would need to parse from output
                 results=parsed["results"],
                 summary=self._format_summary(parsed),
+                execution_status="ok",
             )
 
         except subprocess.TimeoutExpired:
@@ -67,12 +68,21 @@ class GenericRunner:
                 project=self.project_path.name,
                 framework=self.framework,
                 summary="Test execution timed out after 10 minutes",
+                execution_status="timeout",
+            )
+        except FileNotFoundError:
+            return TestRunResult(
+                project=self.project_path.name,
+                framework=self.framework,
+                summary=f"{self.framework} test command not found on PATH",
+                execution_status="tool_missing",
             )
         except Exception as e:
             return TestRunResult(
                 project=self.project_path.name,
                 framework=self.framework,
                 summary=f"Error running tests: {str(e)}",
+                execution_status="runner_error",
             )
 
     def _parse_output(self, output: str) -> dict:
