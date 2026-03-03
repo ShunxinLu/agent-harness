@@ -56,6 +56,35 @@ Ship a single consolidated harness that combines the strongest capabilities from
    - `harness-lint --help`
    - `harness-cleanup --help`
 
+## Execution Status Snapshot (2026-03-03)
+
+### Completed
+
+- Integration branch created and merged with `origin/main`:
+  - merge commit: `e2e7f20`
+- Canonical namespace consolidation completed with no compatibility shim:
+  - package path: `src/agent_harness`
+  - import path target: `agent_harness.*` only
+- Tooling union completed:
+  - lint/cleanup CLI + MCP tools retained
+- Runtime hardening retained from Phase6:
+  - policy/contracts/manifests/session model/evals/observability/db model
+- Post-merge dead-code/import-path cleanup completed:
+  - commit: `34e8d46`
+  - stale monkeypatch targets migrated from `harness.*` to `agent_harness.*`
+  - unused imports/locals removed
+
+### Validation Completed
+
+1. `uvx ruff check src tests` -> pass
+2. `uvx vulture src tests --min-confidence 80` -> pass
+3. `python3 -m compileall src tests scripts` -> pass
+4. `python3 scripts/lint_docs.py` -> pass
+
+### Validation Blocker
+
+- `pytest` execution is currently blocked in this environment due offline dependency resolution (cannot fetch `pytest` from PyPI via `uvx`).
+
 ## Consolidated Target State
 
 ## Keep from `codex/harness-phase6-rollout`
@@ -271,7 +300,7 @@ Lock merged behavior with automated checks to prevent branch drift recurrence.
 ### Steps
 
 1. Add compatibility tests:
-   - import namespace dual support
+   - enforce `agent_harness.*` import-path consistency (no `harness.*` module targets)
 2. Add MCP catalog contract test for unified tool set.
 3. Add scaffold output contract test for required generated files.
 4. Keep and run existing Phase6 tests.
@@ -316,7 +345,7 @@ Publish one authoritative workflow for developers.
 
 Create sequential PRs to keep risk manageable.
 
-1. PR-1: Integration branch + namespace convergence + shim
+1. PR-1: Integration branch + namespace convergence
 2. PR-2: Runtime conflict resolution (keep Phase6 behavior)
 3. PR-3: Lint/Cleanup commands + MCP tooling union
 4. PR-4: Scaffold union + generator tests
