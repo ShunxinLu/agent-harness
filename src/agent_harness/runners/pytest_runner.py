@@ -13,7 +13,6 @@ from ..output import (
     TestResult,
     CompressedError,
     extract_error_info,
-    compress_stack_trace,
 )
 
 
@@ -109,7 +108,7 @@ class PytestRunner:
                         error=error,
                     ))
 
-            except (json.JSONDecodeError, KeyError) as e:
+            except (json.JSONDecodeError, KeyError):
                 # Fall back to stdout parsing
                 test_results = self._parse_stdout(result.stdout)
         else:

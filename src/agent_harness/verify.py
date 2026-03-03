@@ -10,18 +10,16 @@ Usage:
 """
 
 import json
-import sys
 import uuid
-import time
 from pathlib import Path
 from typing import Optional
 
 import click
 
 from .config import detect_project, scan_projects, ProjectConfig
-from .output import TestRunResult, format_result_json, format_summary
+from .output import TestRunResult, format_summary
 from .runners import get_runner
-from .cache import HarnessCache, get_default_cache
+from .cache import get_default_cache
 from .trace_viewer import trace
 
 

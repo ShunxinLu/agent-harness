@@ -7,10 +7,9 @@ Supports: Maven, Gradle, SBT, Cargo, Go
 import subprocess
 import re
 from pathlib import Path
-from typing import Optional, Callable
 
 from ..config import ProjectConfig
-from ..output import TestRunResult, TestResult, CompressedError
+from ..output import TestRunResult, TestResult
 
 
 class GenericRunner:

@@ -7,7 +7,6 @@ Native framework caching handles test selection.
 DuckDB Synergy: Uses the same DuckDB instance as TraceStore for cross-analysis.
 """
 
-import json
 import uuid
 from datetime import datetime
 from pathlib import Path

@@ -14,7 +14,7 @@ from typing import Optional
 
 import click
 
-from .tracing import TraceStore, Tracer
+from .tracing import TraceStore
 
 
 def style(text: str, fg: str = None, bold: bool = False) -> str:
@@ -152,7 +152,7 @@ def export_trace(run_id: str, output: Optional[str]):
     if output:
         output_path = Path(output)
         output_path.write_text(json_output)
-        console_print(style(f"[OK]", fg="green") + f" Exported {len(data)} events to: {output_path}")
+        console_print(style("[OK]", fg="green") + f" Exported {len(data)} events to: {output_path}")
     else:
         console_print(json_output)
 

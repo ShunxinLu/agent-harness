@@ -12,7 +12,12 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(dir:*)",
-      "Bash(pip uninstall:*)"
+      "Bash(pip uninstall:*)",
+      "Bash(harness-lint --help:*)",
+      "Bash(harness-cleanup --help:*)",
+      "Bash(harness-lint check:*)",
+      "Bash(ruff check:*)",
+      "Bash(harness-cleanup run:*)"
     ],
     "additionalDirectories": [
       "c:\\Users\\lushu\\projects"

@@ -11,9 +11,7 @@ Usage:
 """
 
 import subprocess
-import shutil
 from pathlib import Path
-from typing import Optional
 
 import click
 
@@ -188,6 +186,218 @@ addopts = -v --tb=short
 '''
 
     (project_path / "pytest.ini").write_text(pytest_ini_content)
+
+    # Create agent instruction files
+    create_agent_instructions(project_path)
+
+    # Create tach.toml for architecture enforcement
+    create_tach_config(project_path)
+
+    # Create capabilities.json
+    create_capabilities_manifest(project_path)
+
+
+def create_agent_instructions(project_path: Path):
+    """Create agent instruction files for different AI agents."""
+
+    # AGENTS.md - Universal agent guide
+    agents_md = f'''# Agent Guide: {project_path.name}
+
+This project is designed for AI agent development. Any AI agent can:
+1. Read this file for navigation
+2. Run `harness-verify verify --json` to test
+3. Run `harness-lint check` to validate structure
+4. Run `harness-cleanup run --dry-run` to find issues
+
+## Quick Navigation
+
+- Code: `./src/`
+- Tests: `./tests/`
+- Config: `.harness/`
+- Docs: `./docs/`
+
+## Available Tools
+
+| Command | Purpose | Returns |
+|---------|---------|---------|
+| `harness-verify verify --json` | Run tests | JSON result |
+| `harness-lint check` | Validate code | JSON errors |
+| `harness-cleanup run` | Fix entropy | Changes |
+| `harness-scaffold daemon start` | Start sandbox | LocalStack ready |
+
+## Feedback Loop
+
+1. Make change
+2. Run `harness-verify verify --json`
+3. If failed -> read error -> fix -> repeat
+4. If passed -> run `harness-lint check`
+5. If lint passes -> commit
+
+## Common Issues
+
+| Problem | Fix |
+|---------|-----|
+| S3 bucket not found | Run `harness-scaffold daemon start` |
+| Test cache stale | Run `harness-verify cache clear` |
+| Lint failed | Run `harness-lint check --format json` |
+| Architecture violation | Check `tach.toml` for layer rules |
+
+## Agent-Specific Files
+
+- **Claude Code**: See `CLAUDE.md`
+- **Cursor**: See `.cursorrules`
+- **GitHub Copilot**: See `.github/copilot-instructions.md`
+'''
+    (project_path / "AGENTS.md").write_text(agents_md)
+
+    # CLAUDE.md - Claude Code specific
+    claude_md = f'''# Claude Code Instructions
+
+## Project Overview
+{project_path.name} - AI agent development project using harness framework.
+
+## Key Commands
+- Test: `harness-verify verify --json`
+- Lint: `harness-lint check --format json`
+- Cleanup: `harness-cleanup run --dry-run`
+- Sandbox: `harness-scaffold daemon start`
+
+## MCP Server
+This project uses the harness MCP server. Available tools:
+- `run_tests` - Run tests for the project
+- `list_projects` - List detectable projects
+- `get_cache_status` - Get cache statistics
+- `get_trace` - Get trace events for a run ID
+- `analyze_errors` - Analyze error patterns
+
+## Workflow
+1. Read AGENTS.md for project structure
+2. Make changes
+3. Run tests with JSON output
+4. Run lint check
+5. Commit when both pass
+
+## Sandbox Services
+Configured: LocalStack (S3, SQS), DuckDB
+'''
+    (project_path / "CLAUDE.md").write_text(claude_md)
+
+    # .cursorrules - Cursor IDE rules
+    cursorrules = f'''# Cursor Rules for {project_path.name}
+
+## Always
+- Run `harness-verify verify --json` after making code changes
+- Run `harness-lint check --format json` before committing
+- Read AGENTS.md for project navigation
+- Check tach.toml for layer boundaries
+
+## Never
+- Import from higher architectural layers (see tach.toml)
+- Leave TODO comments without tracking issue
+- Commit without running tests and lint
+
+## Testing
+- Tests are in `./tests/`
+- Use pytest fixtures: `s3_client`, `duckdb_conn`
+- Run: `harness-verify verify --json`
+
+## Code Style
+- Follow existing patterns
+- Add docstrings to public functions
+- Type hints required
+'''
+    (project_path / ".cursorrules").write_text(cursorrules)
+
+    # .github/copilot-instructions.md
+    github_dir = project_path / ".github"
+    github_dir.mkdir(exist_ok=True)
+    copilot_md = f'''# GitHub Copilot Instructions
+
+## Project Context
+{project_path.name} uses the agent-harness framework for testing.
+
+## Guidelines
+- All code must pass `harness-verify verify` and `harness-lint check`
+- Follow layer architecture defined in `tach.toml`
+- Write docstrings for all public functions
+- Prefer JSON output for CLI commands
+- Use type hints
+
+## Testing
+- Tests are in `./tests/`
+- Run: `harness-verify verify --json`
+- Fixtures: `s3_client`, `duckdb_conn`
+
+## Architecture
+- Domain layer: `src/` - business logic
+- Infrastructure: External services via sandbox
+- Tests verify both
+'''
+    (github_dir / "copilot-instructions.md").write_text(copilot_md)
+
+
+def create_tach_config(project_path: Path):
+    """Create tach.toml for architectural boundary enforcement."""
+
+    tach_toml = '''# Tach architecture enforcement
+# https://github.com/gauge-sh/tach
+
+# Define layers (lower number = lower layer)
+# Lower layers CANNOT import from higher layers
+layers = [
+    { name = "domain", level = 0 },
+    { name = "application", level = 1 },
+    { name = "infrastructure", level = 2 },
+    { name = "interface", level = 3 },
+]
+
+# Module definitions
+[[modules]]
+path = "src"
+layer = "domain"
+
+[[modules]]
+path = "tests"
+layer = "interface"
+
+# Dependencies (explicit allowed imports)
+# Anything not listed is forbidden
+[[dependencies]]
+from = "src"
+to = "src"
+
+[[dependencies]]
+from = "tests"
+to = "src"
+
+[[dependencies]]
+from = "tests"
+to = "tests"
+'''
+    (project_path / "tach.toml").write_text(tach_toml)
+
+
+def create_capabilities_manifest(project_path: Path):
+    """Create .harness/capabilities.json self-describing manifest."""
+
+    capabilities = {
+        "harness_version": "0.1.0",
+        "agent_compatible": ["claude-code", "cursor", "copilot", "codex", "any-shell"],
+        "supported_frameworks": ["pytest", "bun", "maven", "gradle", "sbt", "cargo", "go"],
+        "sandbox_services": ["s3", "sqs", "dynamodb", "duckdb"],
+        "commands": {
+            "harness-verify": ["verify", "list", "detect", "cache", "trace"],
+            "harness-scaffold": ["create", "add-sandbox", "daemon"],
+            "harness-lint": ["check", "fix", "init"],
+            "harness-cleanup": ["run", "init"]
+        },
+        "mcp_tools": ["run_tests", "list_projects", "get_cache_status", "get_trace", "analyze_errors"]
+    }
+
+    import json
+    harness_dir = project_path / ".harness"
+    harness_dir.mkdir(exist_ok=True)
+    (harness_dir / "capabilities.json").write_text(json.dumps(capabilities, indent=2))
 
 
 def create_bun_template(project_path: Path):
@@ -481,10 +691,10 @@ harness-scaffold daemon status
     (project_path / "README.md").write_text(readme_content)
 
     console_print(f"[OK] Project created: {project_path}")
-    console_print(f"\nNext steps:")
+    console_print("\nNext steps:")
     console_print(f"  1. cd {project_path}")
-    console_print(f"  2. harness-scaffold daemon start")
-    console_print(f"  3. harness-verify verify --project .")
+    console_print("  2. harness-scaffold daemon start")
+    console_print("  3. harness-verify verify --project .")
 
 
 @app.group()
@@ -669,7 +879,7 @@ def add_sandbox(project_path: str, services: str):
     console_print(f"\nConfigured services: {', '.join(service_list)}")
     console_print("\nNext steps:")
     console_print(f"  1. cd {path}")
-    console_print(f"  2. harness-scaffold daemon start")
+    console_print("  2. harness-scaffold daemon start")
 
 
 if __name__ == "__main__":

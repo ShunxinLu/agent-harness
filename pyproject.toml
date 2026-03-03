@@ -18,11 +18,29 @@ dev = [
     "pytest>=7.4.0",
     "pytest-asyncio>=0.21.0",
 ]
+lint = [
+    "ruff>=0.1.0",
+    "tach>=0.5.0",
+    "vulture>=2.10",
+]
+cleanup = [
+    "pre-commit>=3.0.0",
+]
+frontend = [
+    "playwright>=1.40.0",
+    "axe-core-python>=0.1.0",
+]
+data = [
+    "sdv>=1.0.0",
+    "great-expectations>=0.18.0",
+]
 
 [project.scripts]
 harness-verify = "agent_harness.verify:app"
 harness-scaffold = "agent_harness.scaffold:app"
 harness-mcp = "agent_harness.mcp_server:main"
+harness-lint = "agent_harness.lint:app"
+harness-cleanup = "agent_harness.cleanup:app"
 
 [build-system]
 requires = ["hatchling"]
