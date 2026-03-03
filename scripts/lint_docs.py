@@ -4,7 +4,6 @@ Lightweight docs lint for harness planning artifacts.
 """
 
 from pathlib import Path
-import sys
 
 
 REQUIRED_DOCS = [
@@ -48,4 +47,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
