@@ -3,10 +3,10 @@ from pathlib import Path
 
 from click.testing import CliRunner
 
-from harness.cache import HarnessCache
-from harness.config import ProjectConfig
-from harness.output import TestResult, TestRunResult
-from harness.verify import app
+from agent_harness.cache import HarnessCache
+from agent_harness.config import ProjectConfig
+from agent_harness.output import TestResult, TestRunResult
+from agent_harness.verify import app
 
 
 class _FakeCache:

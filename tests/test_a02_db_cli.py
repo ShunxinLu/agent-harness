@@ -1,6 +1,6 @@
 from click.testing import CliRunner
 
-from harness.verify import app
+from agent_harness.verify import app
 
 
 def test_db_migrate_invokes_migration_runner(monkeypatch):

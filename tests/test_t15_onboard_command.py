@@ -2,9 +2,9 @@ from pathlib import Path
 
 from click.testing import CliRunner
 
-from harness.config import ProjectConfig
-from harness.output import TestRunResult
-from harness.verify import app
+from agent_harness.config import ProjectConfig
+from agent_harness.output import TestRunResult
+from agent_harness.verify import app
 
 
 def _passing_result() -> TestRunResult:

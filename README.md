@@ -14,7 +14,7 @@ A comprehensive test harness for AI agent development with multi-framework suppo
 ## Installation
 
 ```bash
-cd harness
+cd agent-harness
 pip install -e .
 ```
 
@@ -166,6 +166,21 @@ Run the MCP server for Claude Code integration:
 harness-mcp
 ```
 
+### harness-lint
+
+| Command | Description |
+|---------|-------------|
+| `check` | Run structural validation (ruff, tach, vulture) |
+| `fix` | Apply safe auto-fixes via ruff |
+| `init` | Initialize `tach.toml` for architecture checks |
+
+### harness-cleanup
+
+| Command | Description |
+|---------|-------------|
+| `run` | Run entropy cleanup and report findings |
+| `init` | Initialize pre-commit cleanup hooks |
+
 ## Supported Frameworks
 
 | Framework | Detection Files | Test Command |
@@ -255,6 +270,8 @@ Add to your Claude Code MCP settings:
 | `get_trace` | Get trace events for a run |
 | `analyze_errors` | Analyze error patterns |
 | `clear_cache` | Clear the test cache |
+| `lint_check` | Run harness lint checks and return structured output |
+| `cleanup_run` | Run cleanup flow (dry-run/auto modes) |
 
 `run_tests` accepts:
 - `project_path`
@@ -282,8 +299,8 @@ Use this override only when intentionally running outside safe-local mode.
 ## Project Structure
 
 ```
-harness/
-├── src/harness/
+agent-harness/
+├── src/agent_harness/
 │   ├── __init__.py          # Package init with lazy exports
 │   ├── verify.py            # Main CLI (Click)
 │   ├── scaffold.py          # Project scaffolding CLI
@@ -292,6 +309,8 @@ harness/
 │   ├── tracing.py           # Trace decorator and store
 │   ├── trace_viewer.py      # Trace CLI and analysis
 │   ├── mcp_server.py        # MCP server for Claude Code
+│   ├── lint.py              # Structural lint orchestrator
+│   ├── cleanup.py           # Cleanup/entropy management
 │   ├── runners/
 │   │   ├── __init__.py
 │   │   ├── pytest_runner.py  # Pytest executor

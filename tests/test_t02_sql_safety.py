@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from harness.cache import HarnessCache
-from harness.tracing import TraceStore, Tracer
+from agent_harness.cache import HarnessCache
+from agent_harness.tracing import TraceStore, Tracer
 
 
 def test_cache_get_errors_handles_global_and_project_filters(tmp_path: Path):

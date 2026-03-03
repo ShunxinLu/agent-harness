@@ -2,9 +2,9 @@ from pathlib import Path
 
 import duckdb
 
-from harness.cache import HarnessCache
-from harness.repository import DuckDBRepository
-from harness.tracing import TraceStore, Tracer
+from agent_harness.cache import HarnessCache
+from agent_harness.repository import DuckDBRepository
+from agent_harness.tracing import TraceStore, Tracer
 
 
 def test_duckdb_repository_query_helpers():

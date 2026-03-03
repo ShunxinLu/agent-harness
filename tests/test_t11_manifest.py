@@ -1,9 +1,9 @@
 import json
 from pathlib import Path
 
-from harness.config import ProjectConfig
-from harness.manifest import write_project_run_manifest
-from harness.output import TestResult, TestRunResult
+from agent_harness.config import ProjectConfig
+from agent_harness.manifest import write_project_run_manifest
+from agent_harness.output import TestResult, TestRunResult
 
 
 def test_write_project_run_manifest_creates_artifact(tmp_path: Path):

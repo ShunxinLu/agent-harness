@@ -1,10 +1,10 @@
 import json
 from pathlib import Path
 
-from harness.config import ProjectConfig
-from harness.policy import PolicyEngine
-from harness.policy_backends import LocalPolicyBackend, OPAPolicyBackend
-from harness.policy_backends.opa import OPAPolicyBackend as _OPABackendClass
+from agent_harness.config import ProjectConfig
+from agent_harness.policy import PolicyEngine
+from agent_harness.policy_backends import LocalPolicyBackend, OPAPolicyBackend
+from agent_harness.policy_backends.opa import OPAPolicyBackend as _OPABackendClass
 
 
 def _project(path: Path, name: str = "proj", framework: str = "pytest") -> ProjectConfig:

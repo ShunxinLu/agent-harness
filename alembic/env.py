@@ -19,7 +19,7 @@ SRC_DIR = REPO_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from harness.db.models import Base  # noqa: E402
+from agent_harness.db.models import Base  # noqa: E402
 
 
 target_metadata = Base.metadata
@@ -63,4 +63,3 @@ if context.is_offline_mode():
     run_migrations_offline()
 else:
     run_migrations_online()
-

@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from harness.config import ProjectConfig
-from harness.policy import PolicyEngine
+from agent_harness.config import ProjectConfig
+from agent_harness.policy import PolicyEngine
 
 
 def _project(path: Path, name: str = "project", framework: str = "pytest") -> ProjectConfig:

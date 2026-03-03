@@ -4,7 +4,7 @@ from pathlib import Path
 
 from click.testing import CliRunner
 
-from harness.verify import app
+from agent_harness.verify import app
 
 
 def test_init_project_creates_expected_artifacts(tmp_path: Path):

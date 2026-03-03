@@ -208,22 +208,21 @@ Expected conflict classes:
 2. Merge `origin/main` into this integration branch.
 3. Resolve only structural conflicts first (do not refactor behavior in the same step).
 
-## Phase 2: Converge on package namespace with compatibility shim
+## Phase 2: Converge on package namespace (single canonical package)
 
 Recommended canonical namespace: `agent_harness` (matches `origin/main` rename intent).
 
 Plan:
 
 1. Move canonical source to `src/agent_harness`.
-2. Keep a compatibility shim package `src/harness` for one transition cycle.
-3. Update all internal imports to canonical namespace.
-4. Keep CLI command names stable (`harness-verify`, `harness-scaffold`, `harness-mcp`, `harness-lint`, `harness-cleanup`).
+2. Update all internal imports and tests to canonical namespace.
+3. Keep CLI command names stable (`harness-verify`, `harness-scaffold`, `harness-mcp`, `harness-lint`, `harness-cleanup`).
 
 Why this is the right approach:
 
 - Avoids perpetual divergence with upstream `main`
-- Preserves current users/scripts via shim
-- Enables staged deprecation instead of hard break
+- Removes deprecated duplicate module paths (`src/harness/*`)
+- Keeps user-facing CLI stable while simplifying internal package ownership
 
 ## Phase 3: Feature union (not replacement)
 
@@ -244,7 +243,7 @@ From `origin/main`, preserve and port:
 
 Add/extend tests covering:
 
-1. Namespace compatibility (`import harness.*` and `import agent_harness.*`)
+1. Namespace migration correctness (`import agent_harness.*`)
 2. MCP tool registry includes both:
    - session/feature tools
    - lint/cleanup tools
@@ -283,7 +282,7 @@ Recommended validation gates:
 - Confirm canonical package name: `agent_harness` with `harness` shim
 - Confirm MCP tool contract should include both feature-session tools and lint/cleanup tools
 - Confirm default project scan root policy (`cwd` recommended)
-- Confirm deprecation window for old import path (`harness.*`)
+- Confirm migration completion for legacy `harness.*` imports
 
 ## Final Recommendation
 

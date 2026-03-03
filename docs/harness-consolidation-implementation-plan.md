@@ -21,14 +21,13 @@ Ship a single consolidated harness that combines the strongest capabilities from
 
 - Preserve current Phase6 runtime safety and governance behavior.
 - Adopt `agent_harness` canonical namespace to align with `origin/main`.
-- Maintain backward compatibility for existing `harness.*` imports during transition.
 - Keep CLI command names stable (`harness-verify`, `harness-scaffold`, `harness-mcp`, `harness-lint`, `harness-cleanup`).
 - Keep changes reviewable by splitting into sequenced PRs with explicit validation gates.
 
 ### Files in Scope
 
 - Packaging and entrypoints: `pyproject.toml`
-- Core runtime: `src/harness/*` and future `src/agent_harness/*`
+- Core runtime: `src/agent_harness/*`
 - MCP/CLI surface: `src/*/verify.py`, `src/*/mcp_server.py`, `src/*/scaffold.py`
 - Tooling: `src/*/lint.py`, `src/*/cleanup.py`
 - Persistence/trace/safety: cache/tracing/sandbox/policy/contracts/evals/db/observability modules
@@ -38,7 +37,6 @@ Ship a single consolidated harness that combines the strongest capabilities from
 ### Acceptance Criteria
 
 - One canonical package (`agent_harness`) builds and runs.
-- Compatibility shim keeps `harness.*` imports functional for one transition cycle.
 - Consolidated MCP toolset includes both:
   - runtime governance/session tools
   - lint/cleanup tools
@@ -125,35 +123,32 @@ Prepare a clean integration lane and baseline measurements.
 
 ### Goal
 
-Adopt `agent_harness` canonical namespace while preserving compatibility.
+Adopt `agent_harness` as the single canonical namespace.
 
 ### Steps
 
 1. Set canonical package path to `src/agent_harness`.
-2. Add compatibility shim package at `src/harness`:
-   - re-export canonical modules for backward import compatibility.
-3. Update `pyproject.toml`:
+2. Update `pyproject.toml`:
    - project name to `agent-harness`
    - wheel package list to canonical path
    - retain full extras from both branches (`migrations`, `observability`, `integration`, `lint`, `cleanup`, plus existing dev extras)
-4. Ensure CLI entrypoints resolve to canonical modules.
-5. Add deprecation note for `harness.*` import path in README/docs.
+3. Ensure CLI entrypoints resolve to canonical modules.
+4. Update internal imports and tests to `agent_harness.*`.
 
 ### Files in Scope
 
 - `pyproject.toml`
 - `src/agent_harness/**`
-- `src/harness/**` (compatibility layer)
 - `README.md`
 
 ### Acceptance Criteria
 
-- `import agent_harness` and `import harness` both work.
+- `import agent_harness` works across CLI/runtime/tests.
 - Installed scripts still run with unchanged command names.
 
 ### Validation
 
-- `python3 -c "import agent_harness, harness; print('ok')"`
+- `python3 -c "import agent_harness; print('ok')"`
 - CLI smoke checks
 
 ## Phase 2: Core Runtime Merge (No Behavior Regression)
@@ -305,7 +300,7 @@ Publish one authoritative workflow for developers.
    - safe defaults and optional overrides
 2. Update docs index to include this consolidation plan and final architecture note.
 3. Add migration note:
-   - `harness.*` imports deprecated timeline
+   - package namespace migration notes (`harness` -> `agent_harness`)
    - what changed for MCP clients
 
 ### Acceptance Criteria
@@ -338,7 +333,7 @@ Each PR must include:
 
 ## Risk 1: Namespace breakage
 
-- Mitigation: compatibility shim + import tests + release note.
+- Mitigation: full import-path migration in tests/code + release note.
 
 ## Risk 2: MCP client incompatibility
 
@@ -386,7 +381,7 @@ Higher reliability and reproducibility with acceptable overhead, especially for 
 
 ## Exit Checklist (Definition of Done)
 
-- Canonical package is `agent_harness` and compatibility shim exists.
+- Canonical package is `agent_harness` and no `src/harness` runtime modules remain.
 - Unified MCP tool list and CLI commands are functional.
 - Safe-by-default sandbox behavior is unchanged from Phase6.
 - Consolidated scaffold generates runtime + legibility artifacts.

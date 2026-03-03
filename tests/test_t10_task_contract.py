@@ -2,7 +2,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from harness.contracts import load_task_contract
+from agent_harness.contracts import load_task_contract
 
 
 def test_load_task_contract_valid(tmp_path: Path):

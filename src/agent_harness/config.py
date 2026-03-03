@@ -4,7 +4,6 @@ Configuration and project auto-detection for the harness.
 Supports: pytest, bun, npm, maven, gradle, sbt, cargo, go, pyspark
 """
 
-import os
 from pathlib import Path
 from typing import Optional
 from pydantic import BaseModel

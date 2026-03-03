@@ -3,11 +3,11 @@ import json
 from contextlib import contextmanager
 from pathlib import Path
 
-from harness.config import ProjectConfig
-from harness.mcp_server import handle_run_tests
-from harness.observability import NoopSpan, start_span
-from harness.output import TestResult, TestRunResult
-from harness.verify import run_tests
+from agent_harness.config import ProjectConfig
+from agent_harness.mcp_server import handle_run_tests
+from agent_harness.observability import NoopSpan, start_span
+from agent_harness.output import TestResult, TestRunResult
+from agent_harness.verify import run_tests
 
 
 class _FakeSpan:

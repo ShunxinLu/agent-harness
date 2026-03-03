@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from harness.session_manager import get_next_feature, update_feature_status
+from agent_harness.session_manager import get_next_feature, update_feature_status
 
 
 def _write_feature_ledger(project_root: Path, payload: dict):

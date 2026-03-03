@@ -11,16 +11,15 @@ Provides tools for:
 
 import json
 import os
-import sys
 import uuid
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import Tool, TextContent
 
-from .config import detect_project, detect_framework, scan_projects, ProjectConfig
+from .config import detect_project, detect_framework, scan_projects
 from .cache import create_cache
 from .tracing import create_trace_store
 from .runners.generic_runner import get_runner
@@ -261,6 +260,47 @@ async def list_tools() -> list[Tool]:
                     }
                 }
             }
+        ),
+        Tool(
+            name="lint_check",
+            description="Run structural lint checks on code (ruff, tach, vulture). Returns JSON with architecture violations, dead code, and style issues.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "project_path": {
+                        "type": "string",
+                        "description": "Path to project directory (default: current directory)"
+                    },
+                    "fix": {
+                        "type": "boolean",
+                        "description": "Auto-fix safe issues",
+                        "default": False
+                    }
+                }
+            }
+        ),
+        Tool(
+            name="cleanup_run",
+            description="Run entropy cleanup - find dead code, fix formatting, run pre-commit hooks.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "project_path": {
+                        "type": "string",
+                        "description": "Path to project directory (default: current directory)"
+                    },
+                    "dry_run": {
+                        "type": "boolean",
+                        "description": "Preview changes without applying",
+                        "default": True
+                    },
+                    "auto": {
+                        "type": "boolean",
+                        "description": "Auto-fix safe changes",
+                        "default": False
+                    }
+                }
+            }
         )
     ]
 
@@ -296,6 +336,10 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             return await handle_analyze_errors(arguments)
         elif name == "clear_cache":
             return await handle_clear_cache(arguments)
+        elif name == "lint_check":
+            return await handle_lint_check(arguments)
+        elif name == "cleanup_run":
+            return await handle_cleanup_run(arguments)
         else:
             return [TextContent(type="text", text=f"Unknown tool: {name}")]
 
@@ -753,6 +797,66 @@ async def handle_clear_cache(arguments: dict) -> list[TextContent]:
         return [TextContent(type="text", text=f"Cache cleared for project: {project}")]
     else:
         return [TextContent(type="text", text="Cache cleared")]
+
+
+async def handle_lint_check(arguments: dict) -> list[TextContent]:
+    """Run lint checks."""
+    import subprocess
+
+    project_path = arguments.get("project_path", ".")
+    fix = arguments.get("fix", False)
+
+    cmd = ["harness-lint", "check", "--format", "json"]
+    if fix:
+        cmd.append("--fix")
+
+    try:
+        result = subprocess.run(
+            cmd,
+            cwd=project_path,
+            capture_output=True,
+            text=True,
+            timeout=60
+        )
+
+        if result.returncode == 0:
+            return [TextContent(type="text", text=result.stdout)]
+        else:
+            return [TextContent(type="text", text=f"Lint check result:\n{result.stdout}\n{result.stderr}")]
+    except FileNotFoundError:
+        return [TextContent(type="text", text="harness-lint not found. Install with: pip install agent-harness[lint]")]
+    except subprocess.TimeoutExpired:
+        return [TextContent(type="text", text="Lint check timed out")]
+
+
+async def handle_cleanup_run(arguments: dict) -> list[TextContent]:
+    """Run cleanup."""
+    import subprocess
+
+    project_path = arguments.get("project_path", ".")
+    dry_run = arguments.get("dry_run", True)
+    auto = arguments.get("auto", False)
+
+    cmd = ["harness-cleanup", "run", "--format", "json"]
+    if dry_run:
+        cmd.append("--dry-run")
+    if auto:
+        cmd.append("--auto")
+
+    try:
+        result = subprocess.run(
+            cmd,
+            cwd=project_path,
+            capture_output=True,
+            text=True,
+            timeout=120
+        )
+
+        return [TextContent(type="text", text=result.stdout if result.stdout else result.stderr)]
+    except FileNotFoundError:
+        return [TextContent(type="text", text="harness-cleanup not found. Install with: pip install agent-harness[cleanup]")]
+    except subprocess.TimeoutExpired:
+        return [TextContent(type="text", text="Cleanup timed out")]
 
 
 def main():

@@ -1,7 +1,7 @@
 from datetime import datetime
 
-from harness.trace_viewer import format_db_timestamp
-from harness.tracing import TraceStore
+from agent_harness.trace_viewer import format_db_timestamp
+from agent_harness.tracing import TraceStore
 
 
 def test_row_to_event_accepts_datetime_timestamp():

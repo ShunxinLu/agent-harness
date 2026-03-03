@@ -3,7 +3,6 @@ Bun test runner for TypeScript/JavaScript projects.
 """
 
 import subprocess
-import json
 import re
 from pathlib import Path
 from typing import Optional
@@ -11,7 +10,6 @@ from typing import Optional
 from ..output import (
     TestRunResult,
     TestResult,
-    CompressedError,
     extract_error_info,
 )
 

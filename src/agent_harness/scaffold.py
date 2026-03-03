@@ -11,9 +11,7 @@ Usage:
 """
 
 import subprocess
-import shutil
 from pathlib import Path
-from typing import Optional
 
 import click
 
@@ -66,7 +64,7 @@ def create_pytest_template(project_path: Path):
     # conftest.py with sandbox fixtures
     conftest_content = '''"""Pytest fixtures with sandbox integration."""
 import pytest
-from harness.sandbox import SandboxManager, SandboxConfig
+from agent_harness.sandbox import SandboxManager, SandboxConfig
 
 
 @pytest.fixture(scope="session")
@@ -188,6 +186,462 @@ addopts = -v --tb=short
 '''
 
     (project_path / "pytest.ini").write_text(pytest_ini_content)
+
+    # Create agent instruction files
+    create_agent_instructions(project_path)
+
+    # Create tach.toml for architecture enforcement
+    create_tach_config(project_path)
+
+    # Create capabilities.json
+    create_capabilities_manifest(project_path)
+
+    # Create docs structure
+    create_docs_structure(project_path)
+
+    # Create execution plan template
+    create_execution_plan_template(project_path)
+
+
+def create_agent_instructions(project_path: Path):
+    """Create agent instruction files for different AI agents."""
+
+    # AGENTS.md - Universal agent guide
+    agents_md = f'''# Agent Guide: {project_path.name}
+
+This project is designed for AI agent development. Any AI agent can:
+1. Read this file for navigation
+2. Run `harness-verify verify --json` to test
+3. Run `harness-lint check` to validate structure
+4. Run `harness-cleanup run --dry-run` to find issues
+
+## Quick Navigation
+
+- Code: `./src/`
+- Tests: `./tests/`
+- Config: `.harness/`
+- Docs: `./docs/`
+
+## Available Tools
+
+| Command | Purpose | Returns |
+|---------|---------|---------|
+| `harness-verify verify --json` | Run tests | JSON result |
+| `harness-lint check` | Validate code | JSON errors |
+| `harness-cleanup run` | Fix entropy | Changes |
+| `harness-scaffold daemon start` | Start sandbox | LocalStack ready |
+
+## Feedback Loop
+
+1. Make change
+2. Run `harness-verify verify --json`
+3. If failed -> read error -> fix -> repeat
+4. If passed -> run `harness-lint check`
+5. If lint passes -> commit
+
+## Common Issues
+
+| Problem | Fix |
+|---------|-----|
+| S3 bucket not found | Run `harness-scaffold daemon start` |
+| Test cache stale | Run `harness-verify cache clear` |
+| Lint failed | Run `harness-lint check --format json` |
+| Architecture violation | Check `tach.toml` for layer rules |
+
+## Agent-Specific Files
+
+- **Claude Code**: See `CLAUDE.md`
+- **Cursor**: See `.cursorrules`
+- **GitHub Copilot**: See `.github/copilot-instructions.md`
+'''
+    (project_path / "AGENTS.md").write_text(agents_md)
+
+    # CLAUDE.md - Claude Code specific
+    claude_md = f'''# Claude Code Instructions
+
+## Project Overview
+{project_path.name} - AI agent development project using harness framework.
+
+## Key Commands
+- Test: `harness-verify verify --json`
+- Lint: `harness-lint check --format json`
+- Cleanup: `harness-cleanup run --dry-run`
+- Sandbox: `harness-scaffold daemon start`
+
+## MCP Server
+This project uses the harness MCP server. Available tools:
+- `run_tests` - Run tests for the project
+- `list_projects` - List detectable projects
+- `get_cache_status` - Get cache statistics
+- `get_trace` - Get trace events for a run ID
+- `analyze_errors` - Analyze error patterns
+
+## Workflow
+1. Read AGENTS.md for project structure
+2. Make changes
+3. Run tests with JSON output
+4. Run lint check
+5. Commit when both pass
+
+## Sandbox Services
+Configured: LocalStack (S3, SQS), DuckDB
+'''
+    (project_path / "CLAUDE.md").write_text(claude_md)
+
+    # .cursorrules - Cursor IDE rules
+    cursorrules = f'''# Cursor Rules for {project_path.name}
+
+## Always
+- Run `harness-verify verify --json` after making code changes
+- Run `harness-lint check --format json` before committing
+- Read AGENTS.md for project navigation
+- Check tach.toml for layer boundaries
+
+## Never
+- Import from higher architectural layers (see tach.toml)
+- Leave TODO comments without tracking issue
+- Commit without running tests and lint
+
+## Testing
+- Tests are in `./tests/`
+- Use pytest fixtures: `s3_client`, `duckdb_conn`
+- Run: `harness-verify verify --json`
+
+## Code Style
+- Follow existing patterns
+- Add docstrings to public functions
+- Type hints required
+'''
+    (project_path / ".cursorrules").write_text(cursorrules)
+
+    # .github/copilot-instructions.md
+    github_dir = project_path / ".github"
+    github_dir.mkdir(exist_ok=True)
+    copilot_md = f'''# GitHub Copilot Instructions
+
+## Project Context
+{project_path.name} uses the agent-harness framework for testing.
+
+## Guidelines
+- All code must pass `harness-verify verify` and `harness-lint check`
+- Follow layer architecture defined in `tach.toml`
+- Write docstrings for all public functions
+- Prefer JSON output for CLI commands
+- Use type hints
+
+## Testing
+- Tests are in `./tests/`
+- Run: `harness-verify verify --json`
+- Fixtures: `s3_client`, `duckdb_conn`
+
+## Architecture
+- Domain layer: `src/` - business logic
+- Infrastructure: External services via sandbox
+- Tests verify both
+'''
+    (github_dir / "copilot-instructions.md").write_text(copilot_md)
+
+
+def create_tach_config(project_path: Path):
+    """Create tach.toml for architectural boundary enforcement."""
+
+    tach_toml = '''# Tach architecture enforcement
+# https://github.com/gauge-sh/tach
+
+# Define layers (lower number = lower layer)
+# Lower layers CANNOT import from higher layers
+layers = [
+    { name = "domain", level = 0 },
+    { name = "application", level = 1 },
+    { name = "infrastructure", level = 2 },
+    { name = "interface", level = 3 },
+]
+
+# Module definitions
+[[modules]]
+path = "src"
+layer = "domain"
+
+[[modules]]
+path = "tests"
+layer = "interface"
+
+# Dependencies (explicit allowed imports)
+# Anything not listed is forbidden
+[[dependencies]]
+from = "src"
+to = "src"
+
+[[dependencies]]
+from = "tests"
+to = "src"
+
+[[dependencies]]
+from = "tests"
+to = "tests"
+'''
+    (project_path / "tach.toml").write_text(tach_toml)
+
+
+def create_capabilities_manifest(project_path: Path):
+    """Create .harness/capabilities.json self-describing manifest."""
+
+    capabilities = {
+        "harness_version": "0.1.0",
+        "agent_compatible": ["claude-code", "cursor", "copilot", "codex", "any-shell"],
+        "supported_frameworks": ["pytest", "bun", "maven", "gradle", "sbt", "cargo", "go"],
+        "sandbox_services": ["s3", "sqs", "dynamodb", "duckdb"],
+        "commands": {
+            "harness-verify": ["verify", "list", "detect", "cache", "trace"],
+            "harness-scaffold": ["create", "add-sandbox", "daemon"],
+            "harness-lint": ["check", "fix", "init"],
+            "harness-cleanup": ["run", "init"]
+        },
+        "mcp_tools": ["run_tests", "list_projects", "get_cache_status", "get_trace", "analyze_errors"]
+    }
+
+    import json
+    harness_dir = project_path / ".harness"
+    harness_dir.mkdir(exist_ok=True)
+    (harness_dir / "capabilities.json").write_text(json.dumps(capabilities, indent=2))
+
+
+def create_docs_structure(project_path: Path):
+    """Create docs/ directory structure for knowledge system."""
+
+    # Create base docs directory
+    docs_dir = project_path / "docs"
+    docs_dir.mkdir(parents=True, exist_ok=True)
+
+    # docs/README.md - Docs navigation
+    docs_readme = f'''# Documentation Index: {project_path.name}
+
+This directory contains structured documentation for the project.
+
+## Directory Structure
+
+```
+docs/
+├── README.md           # This file - docs navigation
+├── architecture/       # Architectural documentation
+│   ├── layers.md       # Layer definitions
+│   └── decisions/      # ADRs (Architectural Decision Records)
+├── execution-plans/    # Active execution plans
+├── taste/             # "Taste invariants" - what good looks like
+│   ├── code-style.md
+│   └── testing-patterns.md
+└── changelog/         # Machine-readable changelog
+    └── auto.md
+```
+
+## Quick Links
+
+- **Architecture**: See [`architecture/layers.md`](architecture/layers.md)
+- **Code Style**: See [`taste/code-style.md`](taste/code-style.md)
+- **Testing Patterns**: See [`taste/testing-patterns.md`](taste/testing-patterns.md)
+- **Execution Plans**: See [`execution-plans/`](execution-plans/)
+
+## For AI Agents
+
+When making changes:
+1. Check relevant docs for context
+2. Update docs if behavior changes
+3. Create execution plan for complex changes
+'''
+    (project_path / "docs" / "README.md").write_text(docs_readme, encoding='utf-8')
+
+    # docs/architecture/layers.md
+    arch_dir = project_path / "docs" / "architecture"
+    arch_dir.mkdir(parents=True, exist_ok=True)
+
+    layers_md = '''# Architecture Layers
+
+This project follows a layered architecture pattern.
+
+## Layer Hierarchy
+
+| Layer | Level | Purpose | Can Import |
+|-------|-------|---------|------------|
+| Domain | 0 | Pure business logic | Domain only |
+| Application | 1 | Use cases, commands, queries | Domain, Application |
+| Infrastructure | 2 | DB, HTTP, external services | All lower layers |
+| Interface | 3 | HTTP handlers, CLI, UI | All layers |
+
+## Rules
+
+1. **Lower layers cannot import higher layers** - This is enforced by `tach`
+2. **Domain layer has zero external dependencies** - Pure business logic
+3. **All public functions must have docstrings** - For agent legibility
+
+## Enforcement
+
+Run `harness-lint check` to validate architecture boundaries.
+
+See `tach.toml` in the project root for the machine-readable configuration.
+'''
+    (arch_dir / "layers.md").write_text(layers_md, encoding='utf-8')
+
+    # docs/architecture/decisions/ directory
+    (arch_dir / "decisions").mkdir(exist_ok=True)
+
+    # docs/taste/ directory
+    taste_dir = project_path / "docs" / "taste"
+    taste_dir.mkdir(parents=True, exist_ok=True)
+
+    code_style_md = '''# Code Style Guide
+
+## General Principles
+
+1. **Clarity over cleverness** - Code should be obvious
+2. **Consistent formatting** - Let ruff handle formatting
+3. **Type hints required** - All public functions must have types
+4. **Docstrings for public APIs** - Explain what, not how
+
+## Python Style
+
+- Use `str | None` instead of `Optional[str]` (Python 3.10+)
+- Prefer `dict[str, Any]` over `Dict` from typing
+- Use f-strings for formatting
+- Max line length: 100 characters (enforced by ruff)
+
+## Naming Conventions
+
+- `snake_case` for functions and variables
+- `PascalCase` for classes
+- `SCREAMING_SNAKE_CASE` for constants
+- Prefix private functions with `_`
+
+## Error Handling
+
+- Use specific exception types
+- Add context to error messages
+- Log errors at appropriate levels
+'''
+    (taste_dir / "code-style.md").write_text(code_style_md)
+
+    testing_patterns_md = '''# Testing Patterns
+
+## Test Organization
+
+- Tests live in `./tests/` directory
+- Test files: `test_*.py`
+- Test functions: `test_*`
+
+## Test Structure
+
+```python
+def test_feature_behavior(fixture_dependency):
+    """Docstring describes what is being tested."""
+    # Arrange
+    # Act
+    # Assert
+```
+
+## Fixtures
+
+- Use provided fixtures: `s3_client`, `duckdb_conn`
+- Keep fixtures minimal and focused
+- Document custom fixtures
+
+## Running Tests
+
+```bash
+# Run all tests
+harness-verify verify --project .
+
+# Run with JSON output (for agents)
+harness-verify verify --project . --json
+
+# Run specific test file
+harness-verify verify --project . tests/test_specific.py
+```
+
+## After Changes
+
+Always run:
+1. `harness-verify verify --json` - Verify tests pass
+2. `harness-lint check` - Verify code quality
+'''
+    (taste_dir / "testing-patterns.md").write_text(testing_patterns_md, encoding='utf-8')
+
+    # docs/changelog/ directory
+    changelog_dir = project_path / "docs" / "changelog"
+    changelog_dir.mkdir(parents=True, exist_ok=True)
+
+    auto_md = f'''# Changelog
+
+This file is auto-generated from git commits.
+
+## {project_path.name}
+
+### [Unreleased]
+
+- Initial project scaffold
+
+---
+
+Generated by harness-cleanup
+'''
+    (changelog_dir / "auto.md").write_text(auto_md, encoding='utf-8')
+
+    # docs/execution-plans/ directory
+    plans_dir = project_path / "docs" / "execution-plans"
+    plans_dir.mkdir(parents=True, exist_ok=True)
+
+
+def create_execution_plan_template(project_path: Path):
+    """Create execution plan template in .harness/plans/."""
+
+    plans_dir = project_path / ".harness" / "plans"
+    plans_dir.mkdir(parents=True, exist_ok=True)
+
+    template_md = '''# Execution Plan: {{intent}}
+
+## Status
+
+- [ ] Not started
+- [ ] In progress
+- [ ] Complete
+- [ ] Abandoned
+
+## Intent
+
+One sentence describing what we're building/fixing.
+
+## Context
+
+Links to relevant docs/, issues, or discussions.
+
+## Plan
+
+1. Step one
+2. Step two
+3. Step three
+
+## Pre-flight Checklist
+
+- [ ] Tests passing before change
+- [ ] Lint passing before change
+- [ ] Related docs reviewed
+
+## Execution Log
+
+| Turn | Agent | What changed | Why |
+|------|-------|--------------|-----|
+| 1 | | | |
+
+## Post-flight Checklist
+
+- [ ] Tests passing after change
+- [ ] Lint passing after change
+- [ ] Docs updated
+- [ ] Plan linked/updated
+
+## Related
+
+- Links to PRs, issues, discussions
+'''
+    (plans_dir / "template.md").write_text(template_md, encoding='utf-8')
 
 
 def create_bun_template(project_path: Path):
@@ -416,7 +870,7 @@ def create_project(name: str, framework: str, output_dir: str, services: str):
 
     if project_path.exists():
         console_print(style(f"Error: Directory already exists: {project_path}", fg="red"))
-        raise click.Exit(1)
+        raise SystemExit(1)
 
     console_print(f"Creating {style(framework, fg='cyan')} project: {style(name, fg='green', bold=True)}")
 
@@ -481,10 +935,10 @@ harness-scaffold daemon status
     (project_path / "README.md").write_text(readme_content)
 
     console_print(f"[OK] Project created: {project_path}")
-    console_print(f"\nNext steps:")
+    console_print("\nNext steps:")
     console_print(f"  1. cd {project_path}")
-    console_print(f"  2. harness-scaffold daemon start")
-    console_print(f"  3. harness-verify verify --project .")
+    console_print("  2. harness-scaffold daemon start")
+    console_print("  3. harness-verify verify --project .")
 
 
 @app.group()
@@ -510,7 +964,7 @@ def daemon_start():
     if not compose_file.exists():
         console_print(style("Error: docker-compose.yml not found", fg="red"))
         console_print("Run harness-scaffold create or add-sandbox first")
-        raise click.Exit(1)
+        raise SystemExit(1)
 
     console_print("Starting LocalStack daemon...")
 
@@ -534,12 +988,12 @@ def daemon_start():
                 console_print(style("[WARN]", fg="yellow") + " LocalStack may still be starting up")
         else:
             console_print(style("[FAIL]", fg="red") + f" Failed to start daemon: {result.stderr}")
-            raise click.Exit(1)
+            raise SystemExit(1)
 
     except FileNotFoundError:
         console_print(style("Error: docker-compose not found", fg="red"))
         console_print("Install Docker Compose or use Docker Desktop")
-        raise click.Exit(1)
+        raise SystemExit(1)
 
 
 @daemon.command("stop")
@@ -556,7 +1010,7 @@ def daemon_stop():
 
     if not compose_file.exists():
         console_print(style("Error: docker-compose.yml not found", fg="red"))
-        raise click.Exit(1)
+        raise SystemExit(1)
 
     console_print("Stopping LocalStack daemon...")
 
@@ -572,11 +1026,11 @@ def daemon_stop():
             console_print(style("[OK]", fg="green") + " LocalStack daemon stopped")
         else:
             console_print(style("[FAIL]", fg="red") + f" Failed to stop daemon: {result.stderr}")
-            raise click.Exit(1)
+            raise SystemExit(1)
 
     except FileNotFoundError:
         console_print(style("Error: docker-compose not found", fg="red"))
-        raise click.Exit(1)
+        raise SystemExit(1)
 
 
 @daemon.command("status")
@@ -614,7 +1068,7 @@ def daemon_reset():
     if not manager.is_daemon_healthy():
         console_print(style("[FAIL]", fg="red") + " LocalStack daemon is not running")
         console_print("Start with: harness-scaffold daemon start")
-        raise click.Exit(1)
+        raise SystemExit(1)
 
     console_print("Resetting LocalStack state...")
 
@@ -669,7 +1123,7 @@ def add_sandbox(project_path: str, services: str):
     console_print(f"\nConfigured services: {', '.join(service_list)}")
     console_print("\nNext steps:")
     console_print(f"  1. cd {path}")
-    console_print(f"  2. harness-scaffold daemon start")
+    console_print("  2. harness-scaffold daemon start")
 
 
 if __name__ == "__main__":

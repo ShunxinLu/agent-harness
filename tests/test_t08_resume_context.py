@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from harness.session_manager import collect_resume_context
+from agent_harness.session_manager import collect_resume_context
 
 
 def test_collect_resume_context_reports_missing_artifacts(tmp_path: Path):

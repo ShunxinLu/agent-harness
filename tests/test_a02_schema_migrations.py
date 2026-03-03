@@ -1,10 +1,10 @@
 import sqlite3
 from pathlib import Path
 
-from harness.cache import HarnessCache
-from harness.db import build_db_url, run_migrations
-from harness.db.models import RunHistory, TestResultRecord, TraceRecord
-from harness.tracing import TraceStore
+from agent_harness.cache import HarnessCache
+from agent_harness.db import build_db_url, run_migrations
+from agent_harness.db.models import RunHistory, TestResultRecord, TraceRecord
+from agent_harness.tracing import TraceStore
 
 
 def _duckdb_columns(cache: HarnessCache, table: str) -> set[str]:

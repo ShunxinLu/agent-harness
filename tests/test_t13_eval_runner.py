@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from harness.evals import evaluate_session
+from agent_harness.evals import evaluate_session
 
 
 def _write_manifest(path: Path, payload: dict):
