@@ -23,7 +23,15 @@ class _FakeCache:
         return None
 
 
-def _fake_run_tests(config: ProjectConfig, trace_enabled=False, extra_args=None, tracer=None):
+def _fake_run_tests(
+    config: ProjectConfig,
+    trace_enabled=False,
+    extra_args=None,
+    tracer=None,
+    session_run_id=None,
+    project_run_id=None,
+):
+    _ = (trace_enabled, extra_args, tracer, session_run_id, project_run_id)
     return TestRunResult(
         project=config.name,
         framework=config.framework,
@@ -96,6 +104,7 @@ def test_verify_json_output_includes_session_and_project_run_ids(monkeypatch, tm
     monkeypatch.setattr("agent_harness.verify.scan_projects", lambda base_dir: projects)
     monkeypatch.setattr("agent_harness.verify.get_default_cache", lambda: fake_cache)
     monkeypatch.setattr("agent_harness.verify.run_tests", _fake_run_tests)
+    monkeypatch.setattr("agent_harness.verify.load_task_contract", lambda _path: None)
 
     runner = CliRunner()
     result = runner.invoke(app, ["verify", "--all", "--base-dir", str(tmp_path), "--json"])
