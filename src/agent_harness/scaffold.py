@@ -196,6 +196,12 @@ addopts = -v --tb=short
     # Create capabilities.json
     create_capabilities_manifest(project_path)
 
+    # Create docs structure
+    create_docs_structure(project_path)
+
+    # Create execution plan template
+    create_execution_plan_template(project_path)
+
 
 def create_agent_instructions(project_path: Path):
     """Create agent instruction files for different AI agents."""
@@ -398,6 +404,244 @@ def create_capabilities_manifest(project_path: Path):
     harness_dir = project_path / ".harness"
     harness_dir.mkdir(exist_ok=True)
     (harness_dir / "capabilities.json").write_text(json.dumps(capabilities, indent=2))
+
+
+def create_docs_structure(project_path: Path):
+    """Create docs/ directory structure for knowledge system."""
+
+    # Create base docs directory
+    docs_dir = project_path / "docs"
+    docs_dir.mkdir(parents=True, exist_ok=True)
+
+    # docs/README.md - Docs navigation
+    docs_readme = f'''# Documentation Index: {project_path.name}
+
+This directory contains structured documentation for the project.
+
+## Directory Structure
+
+```
+docs/
+├── README.md           # This file - docs navigation
+├── architecture/       # Architectural documentation
+│   ├── layers.md       # Layer definitions
+│   └── decisions/      # ADRs (Architectural Decision Records)
+├── execution-plans/    # Active execution plans
+├── taste/             # "Taste invariants" - what good looks like
+│   ├── code-style.md
+│   └── testing-patterns.md
+└── changelog/         # Machine-readable changelog
+    └── auto.md
+```
+
+## Quick Links
+
+- **Architecture**: See [`architecture/layers.md`](architecture/layers.md)
+- **Code Style**: See [`taste/code-style.md`](taste/code-style.md)
+- **Testing Patterns**: See [`taste/testing-patterns.md`](taste/testing-patterns.md)
+- **Execution Plans**: See [`execution-plans/`](execution-plans/)
+
+## For AI Agents
+
+When making changes:
+1. Check relevant docs for context
+2. Update docs if behavior changes
+3. Create execution plan for complex changes
+'''
+    (project_path / "docs" / "README.md").write_text(docs_readme, encoding='utf-8')
+
+    # docs/architecture/layers.md
+    arch_dir = project_path / "docs" / "architecture"
+    arch_dir.mkdir(parents=True, exist_ok=True)
+
+    layers_md = '''# Architecture Layers
+
+This project follows a layered architecture pattern.
+
+## Layer Hierarchy
+
+| Layer | Level | Purpose | Can Import |
+|-------|-------|---------|------------|
+| Domain | 0 | Pure business logic | Domain only |
+| Application | 1 | Use cases, commands, queries | Domain, Application |
+| Infrastructure | 2 | DB, HTTP, external services | All lower layers |
+| Interface | 3 | HTTP handlers, CLI, UI | All layers |
+
+## Rules
+
+1. **Lower layers cannot import higher layers** - This is enforced by `tach`
+2. **Domain layer has zero external dependencies** - Pure business logic
+3. **All public functions must have docstrings** - For agent legibility
+
+## Enforcement
+
+Run `harness-lint check` to validate architecture boundaries.
+
+See `tach.toml` in the project root for the machine-readable configuration.
+'''
+    (arch_dir / "layers.md").write_text(layers_md, encoding='utf-8')
+
+    # docs/architecture/decisions/ directory
+    (arch_dir / "decisions").mkdir(exist_ok=True)
+
+    # docs/taste/ directory
+    taste_dir = project_path / "docs" / "taste"
+    taste_dir.mkdir(parents=True, exist_ok=True)
+
+    code_style_md = '''# Code Style Guide
+
+## General Principles
+
+1. **Clarity over cleverness** - Code should be obvious
+2. **Consistent formatting** - Let ruff handle formatting
+3. **Type hints required** - All public functions must have types
+4. **Docstrings for public APIs** - Explain what, not how
+
+## Python Style
+
+- Use `str | None` instead of `Optional[str]` (Python 3.10+)
+- Prefer `dict[str, Any]` over `Dict` from typing
+- Use f-strings for formatting
+- Max line length: 100 characters (enforced by ruff)
+
+## Naming Conventions
+
+- `snake_case` for functions and variables
+- `PascalCase` for classes
+- `SCREAMING_SNAKE_CASE` for constants
+- Prefix private functions with `_`
+
+## Error Handling
+
+- Use specific exception types
+- Add context to error messages
+- Log errors at appropriate levels
+'''
+    (taste_dir / "code-style.md").write_text(code_style_md)
+
+    testing_patterns_md = '''# Testing Patterns
+
+## Test Organization
+
+- Tests live in `./tests/` directory
+- Test files: `test_*.py`
+- Test functions: `test_*`
+
+## Test Structure
+
+```python
+def test_feature_behavior(fixture_dependency):
+    """Docstring describes what is being tested."""
+    # Arrange
+    # Act
+    # Assert
+```
+
+## Fixtures
+
+- Use provided fixtures: `s3_client`, `duckdb_conn`
+- Keep fixtures minimal and focused
+- Document custom fixtures
+
+## Running Tests
+
+```bash
+# Run all tests
+harness-verify verify --project .
+
+# Run with JSON output (for agents)
+harness-verify verify --project . --json
+
+# Run specific test file
+harness-verify verify --project . tests/test_specific.py
+```
+
+## After Changes
+
+Always run:
+1. `harness-verify verify --json` - Verify tests pass
+2. `harness-lint check` - Verify code quality
+'''
+    (taste_dir / "testing-patterns.md").write_text(testing_patterns_md, encoding='utf-8')
+
+    # docs/changelog/ directory
+    changelog_dir = project_path / "docs" / "changelog"
+    changelog_dir.mkdir(parents=True, exist_ok=True)
+
+    auto_md = f'''# Changelog
+
+This file is auto-generated from git commits.
+
+## {project_path.name}
+
+### [Unreleased]
+
+- Initial project scaffold
+
+---
+
+Generated by harness-cleanup
+'''
+    (changelog_dir / "auto.md").write_text(auto_md, encoding='utf-8')
+
+    # docs/execution-plans/ directory
+    plans_dir = project_path / "docs" / "execution-plans"
+    plans_dir.mkdir(parents=True, exist_ok=True)
+
+
+def create_execution_plan_template(project_path: Path):
+    """Create execution plan template in .harness/plans/."""
+
+    plans_dir = project_path / ".harness" / "plans"
+    plans_dir.mkdir(parents=True, exist_ok=True)
+
+    template_md = '''# Execution Plan: {{intent}}
+
+## Status
+
+- [ ] Not started
+- [ ] In progress
+- [ ] Complete
+- [ ] Abandoned
+
+## Intent
+
+One sentence describing what we're building/fixing.
+
+## Context
+
+Links to relevant docs/, issues, or discussions.
+
+## Plan
+
+1. Step one
+2. Step two
+3. Step three
+
+## Pre-flight Checklist
+
+- [ ] Tests passing before change
+- [ ] Lint passing before change
+- [ ] Related docs reviewed
+
+## Execution Log
+
+| Turn | Agent | What changed | Why |
+|------|-------|--------------|-----|
+| 1 | | | |
+
+## Post-flight Checklist
+
+- [ ] Tests passing after change
+- [ ] Lint passing after change
+- [ ] Docs updated
+- [ ] Plan linked/updated
+
+## Related
+
+- Links to PRs, issues, discussions
+'''
+    (plans_dir / "template.md").write_text(template_md, encoding='utf-8')
 
 
 def create_bun_template(project_path: Path):
