@@ -9,6 +9,7 @@ Commands:
 """
 
 import json
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -39,6 +40,17 @@ def style(text: str, fg: str = None, bold: bool = False) -> str:
 def console_print(text: str):
     """Simple print function."""
     click.echo(text)
+
+
+def format_db_timestamp(value) -> str:
+    """Format timestamp values from DuckDB rows for terminal display."""
+    if value is None:
+        return "N/A"
+    if isinstance(value, datetime):
+        return value.strftime("%Y-%m-%d %H:%M:%S")
+    if isinstance(value, str):
+        return value[:19]
+    return str(value)[:19]
 
 
 def get_trace_store() -> TraceStore:
@@ -227,16 +239,19 @@ def list_traces(limit: int):
     store = get_trace_store()
 
     # Query for distinct run_ids with counts
-    results = store.query(f"""
-        SELECT run_id, COUNT(*) as event_count,
-               MIN(timestamp) as start_time,
-               MAX(timestamp) as end_time,
-               SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) as error_count
-        FROM traces
-        GROUP BY run_id
-        ORDER BY start_time DESC
-        LIMIT {limit}
-    """)
+    results = store.query(
+        """
+            SELECT run_id, COUNT(*) as event_count,
+                   MIN(timestamp) as start_time,
+                   MAX(timestamp) as end_time,
+                   SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) as error_count
+            FROM traces
+            GROUP BY run_id
+            ORDER BY start_time DESC
+            LIMIT ?
+        """,
+        (limit,),
+    )
 
     if not results:
         console_print(style("No traces found.", fg="yellow"))
@@ -250,7 +265,7 @@ def list_traces(limit: int):
         run_id = row["run_id"]
         events = row["event_count"]
         errors = row["error_count"]
-        start_time = row["start_time"][:19] if row["start_time"] else "N/A"
+        start_time = format_db_timestamp(row.get("start_time"))
 
         error_str = style(str(errors), fg="red") if errors > 0 else str(errors)
         console_print(f"{run_id:<36} {events:<8} {error_str:<8} {start_time:<20}")

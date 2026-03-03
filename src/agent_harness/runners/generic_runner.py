@@ -59,6 +59,7 @@ class GenericRunner:
                 duration=0,  # Would need to parse from output
                 results=parsed["results"],
                 summary=self._format_summary(parsed),
+                execution_status="ok",
             )
 
         except subprocess.TimeoutExpired:
@@ -66,12 +67,21 @@ class GenericRunner:
                 project=self.project_path.name,
                 framework=self.framework,
                 summary="Test execution timed out after 10 minutes",
+                execution_status="timeout",
+            )
+        except FileNotFoundError:
+            return TestRunResult(
+                project=self.project_path.name,
+                framework=self.framework,
+                summary=f"{self.framework} test command not found on PATH",
+                execution_status="tool_missing",
             )
         except Exception as e:
             return TestRunResult(
                 project=self.project_path.name,
                 framework=self.framework,
                 summary=f"Error running tests: {str(e)}",
+                execution_status="runner_error",
             )
 
     def _parse_output(self, output: str) -> dict:
@@ -109,7 +119,6 @@ class GenericRunner:
                     passed = total - failed
 
             # Parse individual test results
-            test_pattern = r"^\[?(?:INFO|DEBUG|WARN)\]?\s*(?:Test|Running)[:\s]+(.+)$"
             for line in output.split("\n"):
                 if "<<< FAILURE" in line or "<<< ERROR" in line:
                     # Extract test name
@@ -183,13 +192,16 @@ def get_runner(config: ProjectConfig):
     """Factory function to get appropriate runner."""
     from .pytest_runner import PytestRunner
     from .bun_runner import BunRunner
+    from .npm_runner import NpmRunner
 
     if config.framework == "pytest":
         return PytestRunner(config.path, config.test_dir)
     elif config.framework == "pyspark":
         return PytestRunner(config.path, config.test_dir)
-    elif config.framework in ("bun", "npm"):
+    elif config.framework == "bun":
         return BunRunner(config.path)
+    elif config.framework == "npm":
+        return NpmRunner(config.path)
     elif config.framework in ("maven", "gradle", "sbt", "cargo", "go"):
         return GenericRunner(config.path, config.framework)
     return None

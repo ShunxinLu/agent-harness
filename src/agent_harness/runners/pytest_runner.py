@@ -62,12 +62,14 @@ class PytestRunner:
                 project=self.project_path.name,
                 framework="pytest",
                 summary="Test execution timed out after 5 minutes",
+                execution_status="timeout",
             )
         except FileNotFoundError:
             return TestRunResult(
                 project=self.project_path.name,
                 framework="pytest",
                 summary="pytest not found. Install with: pip install pytest pytest-json-report",
+                execution_status="tool_missing",
             )
 
     def _parse_result(self, result: subprocess.CompletedProcess, cmd: list[str]) -> TestRunResult:
@@ -124,12 +126,6 @@ class PytestRunner:
         # Get total duration
         total_duration = sum(r.duration for r in test_results)
 
-        # Parse summary line from stdout
-        summary_match = re.search(
-            r"(\d+) (?:passed|failed|skipped|error)?[,\s]*(\d+)?",
-            result.stdout
-        )
-
         summary = result.stdout.split("\n")[-3:] if result.stdout else ["No output"]
 
         return TestRunResult(
@@ -143,6 +139,7 @@ class PytestRunner:
             duration=total_duration,
             results=test_results,
             summary="\n".join(summary),
+            execution_status="ok",
         )
 
     def _parse_stdout(self, stdout: str) -> list[TestResult]:

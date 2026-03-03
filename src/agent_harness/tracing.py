@@ -16,6 +16,9 @@ from pydantic import BaseModel
 
 import duckdb
 
+from .observability import set_span_attributes, start_span
+from .repository import DuckDBRepository
+
 
 class TraceEvent(BaseModel):
     """A single trace event."""
@@ -76,11 +79,13 @@ class TraceStore:
             db_file.parent.mkdir(parents=True, exist_ok=True)
 
         self._conn = duckdb.connect(self.db_path)
+        self._repo = DuckDBRepository(self._conn)
+        self._closed = False
         self._init_schema()
 
     def _init_schema(self):
         """Initialize the traces table schema."""
-        self._conn.execute("""
+        self._repo.execute("""
             CREATE TABLE IF NOT EXISTS traces (
                 id VARCHAR PRIMARY KEY,
                 run_id VARCHAR,
@@ -96,14 +101,14 @@ class TraceStore:
         """)
 
         # Create indexes for common queries
-        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_traces_run_id ON traces(run_id)")
-        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_traces_timestamp ON traces(timestamp)")
-        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_traces_event_type ON traces(event_type)")
-        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_traces_status ON traces(status)")
+        self._repo.execute("CREATE INDEX IF NOT EXISTS idx_traces_run_id ON traces(run_id)")
+        self._repo.execute("CREATE INDEX IF NOT EXISTS idx_traces_timestamp ON traces(timestamp)")
+        self._repo.execute("CREATE INDEX IF NOT EXISTS idx_traces_event_type ON traces(event_type)")
+        self._repo.execute("CREATE INDEX IF NOT EXISTS idx_traces_status ON traces(status)")
 
     def store(self, event: TraceEvent):
         """Store a trace event."""
-        self._conn.execute("""
+        self._repo.execute("""
             INSERT INTO traces (id, run_id, timestamp, event_type, name, payload, status, error_message, duration_ms)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
@@ -118,27 +123,38 @@ class TraceStore:
             event.duration_ms,
         ))
 
-    def query(self, sql: str) -> list[dict]:
+    def query(self, sql: str, params: Optional[tuple[Any, ...]] = None) -> list[dict]:
         """Execute a SQL query and return results as dicts."""
-        result = self._conn.execute(sql)
-        columns = [desc[0] for desc in result.description]
-        return [dict(zip(columns, row)) for row in result.fetchall()]
+        return self._repo.fetchall_dict(sql, params)
 
     def get_by_run(self, run_id: str) -> list[TraceEvent]:
         """Get all events for a specific run."""
-        results = self.query(f"SELECT * FROM traces WHERE run_id = '{run_id}' ORDER BY timestamp")
+        results = self.query(
+            "SELECT * FROM traces WHERE run_id = ? ORDER BY timestamp",
+            (run_id,),
+        )
         return [self._row_to_event(r) for r in results]
 
     def get_errors(self, run_id: Optional[str] = None, limit: int = 100) -> list[dict]:
         """Get error events, optionally filtered by run."""
-        where_clause = f"WHERE run_id = '{run_id}'" if run_id else ""
-        results = self.query(f"""
-            SELECT * FROM traces
-            {where_clause} AND status = 'error'
-            ORDER BY timestamp DESC
-            LIMIT {limit}
-        """)
-        return results
+        if run_id:
+            sql = """
+                SELECT * FROM traces
+                WHERE run_id = ? AND status = 'error'
+                ORDER BY timestamp DESC
+                LIMIT ?
+            """
+            params = (run_id, limit)
+        else:
+            sql = """
+                SELECT * FROM traces
+                WHERE status = 'error'
+                ORDER BY timestamp DESC
+                LIMIT ?
+            """
+            params = (limit,)
+
+        return self.query(sql, params)
 
     def analyze_patterns(self, error_pattern: str, min_count: int = 3) -> list[dict]:
         """
@@ -146,24 +162,26 @@ class TraceStore:
 
         Example: Find tools that fail with specific errors more than N times.
         """
-        results = self.query(f"""
-            SELECT payload->>'tool_name' as tool_name,
-                   COUNT(*) as failure_count
-            FROM traces
-            WHERE status = 'error'
-              AND error_message LIKE '%{error_pattern}%'
-            GROUP BY payload->>'tool_name'
-            HAVING COUNT(*) >= {min_count}
-            ORDER BY failure_count DESC
-        """)
-        return results
+        return self.query(
+            """
+                SELECT payload->>'tool_name' as tool_name,
+                       COUNT(*) as failure_count
+                FROM traces
+                WHERE status = 'error'
+                  AND error_message LIKE ?
+                GROUP BY payload->>'tool_name'
+                HAVING COUNT(*) >= ?
+                ORDER BY failure_count DESC
+            """,
+            (f"%{error_pattern}%", min_count),
+        )
 
     def _row_to_event(self, row: dict) -> TraceEvent:
         """Convert a database row to TraceEvent."""
         return TraceEvent(
             id=row["id"],
             run_id=row["run_id"],
-            timestamp=datetime.fromisoformat(row["timestamp"]),
+            timestamp=self._coerce_timestamp(row["timestamp"]),
             event_type=row["event_type"],
             name=row["name"],
             payload=json.loads(row["payload"]) if row["payload"] else {},
@@ -172,9 +190,25 @@ class TraceStore:
             duration_ms=row["duration_ms"],
         )
 
+    def _coerce_timestamp(self, value: Any) -> datetime:
+        """Normalize DuckDB timestamp values to datetime."""
+        if isinstance(value, datetime):
+            return value
+        if isinstance(value, str):
+            return datetime.fromisoformat(value)
+
+        raise TypeError(f"Unsupported timestamp type: {type(value)!r}")
+
     def close(self):
         """Close the database connection."""
-        self._conn.close()
+        if not self._closed:
+            self._repo.close()
+            self._closed = True
+
+    @property
+    def is_closed(self) -> bool:
+        """Whether the underlying DuckDB connection has been closed."""
+        return self._closed
 
 
 class Tracer:
@@ -217,6 +251,7 @@ class Tracer:
             name=name,
             payload=kwargs,
             status="ok",
+            duration_ms=duration_ms,
         )
 
         self._events.append(event)
@@ -262,12 +297,26 @@ class Tracer:
 _default_store: Optional[TraceStore] = None
 
 
+def get_default_db_path() -> str:
+    """Get the default persistent DuckDB path used by the harness."""
+    data_dir = Path.home() / ".harness" / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    return str(data_dir / "harness.duckdb")
+
+
 def get_default_store(db_path: Optional[str] = None) -> TraceStore:
     """Get or create default trace store."""
     global _default_store
-    if _default_store is None:
+    if db_path is None:
+        db_path = get_default_db_path()
+    if _default_store is None or _default_store.is_closed:
         _default_store = TraceStore(db_path)
     return _default_store
+
+
+def create_trace_store(db_path: Optional[str] = None) -> TraceStore:
+    """Create a fresh trace-store connection to the default or provided database."""
+    return TraceStore(db_path or get_default_db_path())
 
 
 # Trace decorator
@@ -286,19 +335,35 @@ def trace(func=None, *, event_type: str = "function"):
     """
     def decorator(fn):
         def wrapper(*args, **kwargs):
-            tracer = Tracer(store=get_default_store())
+            with start_span(
+                "harness.trace.decorated_function",
+                {
+                    "harness.function_name": fn.__name__,
+                    "harness.event_type": event_type,
+                },
+            ) as span:
+                tracer = Tracer(store=get_default_store())
+                set_span_attributes(span, {"harness.trace_run_id": tracer.run_id})
 
-            # Log start
-            tracer.start_timing(fn.__name__)
-            tracer.log(fn.__name__, event_type=event_type, args=args, kwargs=kwargs)
+                # Log start
+                tracer.start_timing(fn.__name__)
+                tracer.log(fn.__name__, event_type=event_type, args=args, kwargs=kwargs)
 
-            try:
-                result = fn(*args, **kwargs)
-                tracer.log(f"{fn.__name__}.complete", event_type=f"{event_type}.success")
-                return result
-            except Exception as e:
-                tracer.log_error(fn.__name__, e, event_type=event_type)
-                raise
+                try:
+                    result = fn(*args, **kwargs)
+                    tracer.log(f"{fn.__name__}.complete", event_type=f"{event_type}.success")
+                    set_span_attributes(span, {"harness.status": "ok"})
+                    return result
+                except Exception as e:
+                    tracer.log_error(fn.__name__, e, event_type=event_type)
+                    set_span_attributes(
+                        span,
+                        {
+                            "harness.status": "error",
+                            "harness.error_message": str(e),
+                        },
+                    )
+                    raise
 
         return wrapper
 
@@ -316,12 +381,28 @@ def trace_context(name: str, event_type: str = "block"):
         with trace_context("agent_loop"):
             # ... code ...
     """
-    tracer = Tracer(store=get_default_store())
-    tracer.log(f"{name}.start", event_type=f"{event_type}.start")
+    with start_span(
+        "harness.trace.context",
+        {
+            "harness.context_name": name,
+            "harness.event_type": event_type,
+        },
+    ) as span:
+        tracer = Tracer(store=get_default_store())
+        set_span_attributes(span, {"harness.trace_run_id": tracer.run_id})
+        tracer.log(f"{name}.start", event_type=f"{event_type}.start")
 
-    try:
-        yield tracer
-        tracer.log(f"{name}.complete", event_type=f"{event_type}.complete")
-    except Exception as e:
-        tracer.log_error(name, e, event_type=f"{event_type}.error")
-        raise
+        try:
+            yield tracer
+            tracer.log(f"{name}.complete", event_type=f"{event_type}.complete")
+            set_span_attributes(span, {"harness.status": "ok"})
+        except Exception as e:
+            tracer.log_error(name, e, event_type=f"{event_type}.error")
+            set_span_attributes(
+                span,
+                {
+                    "harness.status": "error",
+                    "harness.error_message": str(e),
+                },
+            )
+            raise

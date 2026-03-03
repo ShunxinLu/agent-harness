@@ -53,12 +53,14 @@ class BunRunner:
                 project=self.project_path.name,
                 framework="bun",
                 summary="Test execution timed out after 5 minutes",
+                execution_status="timeout",
             )
         except FileNotFoundError:
             return TestRunResult(
                 project=self.project_path.name,
                 framework="bun",
                 summary="bun not found. Install from https://bun.sh",
+                execution_status="tool_missing",
             )
 
     def _parse_result(self, result: subprocess.CompletedProcess) -> TestRunResult:
@@ -86,6 +88,7 @@ class BunRunner:
             duration=total_duration,
             results=test_results,
             summary=result.stdout.split("\n")[-5:] if result.stdout else ["No output"],
+            execution_status="ok",
         )
 
     def _parse_stdout(self, stdout: str, returncode: int) -> list[TestResult]:
