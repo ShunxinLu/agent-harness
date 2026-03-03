@@ -6,6 +6,7 @@ Last updated: 2026-03-03
 
 1. [Harness Team Implementation Plan v2](./harness-team-implementation-plan-v2.md)
 2. [Harness Implementation Task Sequence](./harness-implementation-task-sequence.md)
+3. [Harness Consolidation Implementation Plan](./harness-consolidation-implementation-plan.md)
 
 ## Architecture
 
