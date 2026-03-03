@@ -48,8 +48,8 @@ def test_onboard_creates_project_yaml_and_artifacts(monkeypatch, tmp_path: Path)
         test_dir=project / "tests",
         command=["pytest"],
     )
-    monkeypatch.setattr("harness.verify.detect_project", lambda project_root: config)
-    monkeypatch.setattr("harness.verify.run_tests", lambda *args, **kwargs: _passing_result())
+    monkeypatch.setattr("agent_harness.verify.detect_project", lambda project_root: config)
+    monkeypatch.setattr("agent_harness.verify.run_tests", lambda *args, **kwargs: _passing_result())
 
     runner = CliRunner()
     result = runner.invoke(app, ["onboard", "--project", str(project)])
@@ -72,10 +72,9 @@ def test_onboard_fails_when_baseline_verification_fails(monkeypatch, tmp_path: P
         test_dir=project / "tests",
         command=["pytest"],
     )
-    monkeypatch.setattr("harness.verify.detect_project", lambda project_root: config)
-    monkeypatch.setattr("harness.verify.run_tests", lambda *args, **kwargs: _failing_result())
+    monkeypatch.setattr("agent_harness.verify.detect_project", lambda project_root: config)
+    monkeypatch.setattr("agent_harness.verify.run_tests", lambda *args, **kwargs: _failing_result())
 
     runner = CliRunner()
     result = runner.invoke(app, ["onboard", "--project", str(project)])
     assert result.exit_code == 1
-

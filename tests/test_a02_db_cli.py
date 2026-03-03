@@ -11,7 +11,7 @@ def test_db_migrate_invokes_migration_runner(monkeypatch):
         called["db_url"] = db_url
         called["db_path"] = db_path
 
-    monkeypatch.setattr("harness.verify.run_migrations", _fake_run_migrations)
+    monkeypatch.setattr("agent_harness.verify.run_migrations", _fake_run_migrations)
 
     runner = CliRunner()
     result = runner.invoke(app, ["db", "migrate", "--db-path", "/tmp/harness-test.duckdb"])
@@ -20,4 +20,3 @@ def test_db_migrate_invokes_migration_runner(monkeypatch):
     assert called["revision"] == "head"
     assert called["db_path"] == "/tmp/harness-test.duckdb"
     assert called["db_url"].startswith("duckdb:///")
-

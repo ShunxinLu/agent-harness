@@ -10,7 +10,7 @@ from typing import Optional
 
 from .config import ProjectConfig
 from .policy_backends import LocalPolicyBackend, OPAPolicyBackend, PolicyBackend
-from .policy_models import PolicyDecision, PolicyResult
+from .policy_models import PolicyResult
 
 
 class PolicyEngine:
@@ -33,4 +33,3 @@ class PolicyEngine:
     def evaluate_verify_request(self, projects: list[ProjectConfig], data_mode: str) -> PolicyResult:
         """Evaluate verify request against selected policy backend."""
         return self.backend.evaluate_verify_request(projects, data_mode)
-

@@ -119,7 +119,6 @@ class GenericRunner:
                     passed = total - failed
 
             # Parse individual test results
-            test_pattern = r"^\[?(?:INFO|DEBUG|WARN)\]?\s*(?:Test|Running)[:\s]+(.+)$"
             for line in output.split("\n"):
                 if "<<< FAILURE" in line or "<<< ERROR" in line:
                     # Extract test name

@@ -126,12 +126,6 @@ class PytestRunner:
         # Get total duration
         total_duration = sum(r.duration for r in test_results)
 
-        # Parse summary line from stdout
-        summary_match = re.search(
-            r"(\d+) (?:passed|failed|skipped|error)?[,\s]*(\d+)?",
-            result.stdout
-        )
-
         summary = result.stdout.split("\n")[-3:] if result.stdout else ["No output"]
 
         return TestRunResult(

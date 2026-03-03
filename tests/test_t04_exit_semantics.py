@@ -55,13 +55,12 @@ def test_verify_exits_non_zero_on_execution_failure(monkeypatch, tmp_path: Path)
             execution_status="tool_missing",
         )
 
-    monkeypatch.setattr("harness.verify.scan_projects", lambda base_dir: projects)
-    monkeypatch.setattr("harness.verify.get_default_cache", lambda: _FakeCache())
-    monkeypatch.setattr("harness.verify.run_tests", _runner_error_result)
+    monkeypatch.setattr("agent_harness.verify.scan_projects", lambda base_dir: projects)
+    monkeypatch.setattr("agent_harness.verify.get_default_cache", lambda: _FakeCache())
+    monkeypatch.setattr("agent_harness.verify.run_tests", _runner_error_result)
 
     runner = CliRunner()
     result = runner.invoke(app, ["verify", "--all", "--base-dir", str(tmp_path)])
 
     assert result.exit_code == 1
     assert "Execution failures: 1" in result.output
-

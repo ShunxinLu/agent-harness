@@ -93,9 +93,9 @@ def test_verify_json_output_includes_session_and_project_run_ids(monkeypatch, tm
     ]
 
     fake_cache = _FakeCache()
-    monkeypatch.setattr("harness.verify.scan_projects", lambda base_dir: projects)
-    monkeypatch.setattr("harness.verify.get_default_cache", lambda: fake_cache)
-    monkeypatch.setattr("harness.verify.run_tests", _fake_run_tests)
+    monkeypatch.setattr("agent_harness.verify.scan_projects", lambda base_dir: projects)
+    monkeypatch.setattr("agent_harness.verify.get_default_cache", lambda: fake_cache)
+    monkeypatch.setattr("agent_harness.verify.run_tests", _fake_run_tests)
 
     runner = CliRunner()
     result = runner.invoke(app, ["verify", "--all", "--base-dir", str(tmp_path), "--json"])
@@ -115,4 +115,3 @@ def test_verify_json_output_includes_session_and_project_run_ids(monkeypatch, tm
     cached_parent_run_ids = {call["parent_run_id"] for call in fake_cache.store_calls}
     assert cached_project_run_ids == project_run_ids
     assert cached_parent_run_ids == {payload["session_run_id"]}
-

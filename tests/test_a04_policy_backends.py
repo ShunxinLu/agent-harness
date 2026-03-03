@@ -60,7 +60,7 @@ def test_opa_backend_parses_structured_allow_response(monkeypatch, tmp_path: Pat
             ],
         }
     }
-    monkeypatch.setattr("harness.policy_backends.opa.request.urlopen", lambda req, timeout: _FakeHTTPResponse(payload))
+    monkeypatch.setattr("agent_harness.policy_backends.opa.request.urlopen", lambda req, timeout: _FakeHTTPResponse(payload))
 
     backend = _OPABackendClass(endpoint="http://opa.local/v1/data/harness/allow")
     result = backend.evaluate_verify_request([_project(project_path)], data_mode="mock")
@@ -80,4 +80,3 @@ def test_opa_backend_denies_when_response_is_unreachable(tmp_path: Path):
     assert result.allowed is False
     assert result.decisions
     assert result.decisions[0].action == "opa.request"
-

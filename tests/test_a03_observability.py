@@ -51,8 +51,8 @@ def test_verify_run_tests_includes_run_ids_in_span_attributes(monkeypatch, tmp_p
                 execution_status="ok",
             )
 
-    monkeypatch.setattr("harness.verify.start_span", _fake_start_span)
-    monkeypatch.setattr("harness.verify.get_runner", lambda config: _FakeRunner())
+    monkeypatch.setattr("agent_harness.verify.start_span", _fake_start_span)
+    monkeypatch.setattr("agent_harness.verify.get_runner", lambda _config: _FakeRunner())
 
     config = ProjectConfig(
         path=tmp_path,
@@ -123,13 +123,13 @@ def test_mcp_run_tests_emits_preflight_and_project_spans(monkeypatch, tmp_path: 
         command=["pytest"],
     )
 
-    monkeypatch.setattr("harness.mcp_server.start_span", _fake_start_span)
-    monkeypatch.setattr("harness.mcp_server.detect_project", lambda path: project)
-    monkeypatch.setattr("harness.mcp_server.get_runner", lambda cfg: _FakeRunner())
-    monkeypatch.setattr("harness.mcp_server.create_cache", lambda: _FakeCache())
-    monkeypatch.setattr("harness.mcp_server.load_task_contract", lambda path: None)
+    monkeypatch.setattr("agent_harness.mcp_server.start_span", _fake_start_span)
+    monkeypatch.setattr("agent_harness.mcp_server.detect_project", lambda path: project)
+    monkeypatch.setattr("agent_harness.mcp_server.get_runner", lambda _cfg: _FakeRunner())
+    monkeypatch.setattr("agent_harness.mcp_server.create_cache", lambda: _FakeCache())
+    monkeypatch.setattr("agent_harness.mcp_server.load_task_contract", lambda path: None)
     monkeypatch.setattr(
-        "harness.mcp_server.write_project_run_manifest",
+        "agent_harness.mcp_server.write_project_run_manifest",
         lambda **kwargs: tmp_path / ".harness" / "runs" / "manifest.json",
     )
 
@@ -153,4 +153,3 @@ def test_mcp_run_tests_emits_preflight_and_project_spans(monkeypatch, tmp_path: 
     assert project_span.initial_attributes["harness.session_run_id"] == payload["session_run_id"]
     assert project_span.initial_attributes["harness.project_run_id"] == payload["project_run_id"]
     assert project_span.attributes["harness.execution_status"] == "ok"
-
